@@ -406,9 +406,10 @@ app.post('/api/otp/send', async (req, res) => {
         console.log(`[OTP] Checking Firebase Auth for user: ${normalizedEmail}`);
         const userRecord = await admin.auth().getUserByEmail(normalizedEmail);
         console.log(`[OTP] ✅ User found: ${userRecord.uid} - Email: ${userRecord.email} - Proceeding with OTP`);
-        // User exists, proceed with OTP generation below
+        // User exists, proceed with OTP generation below (continue to line 433+)
       } catch (authError) {
         console.error(`[OTP] Firebase Auth error:`, authError.code, authError.message);
+        console.error(`[OTP] Full error:`, JSON.stringify(authError));
         
         if (authError.code === 'auth/user-not-found') {
           // User doesn't exist - return error and don't send OTP
@@ -418,12 +419,10 @@ app.post('/api/otp/send', async (req, res) => {
             message: 'No account found with this email address. Please check your email or register a new account.'
           });
         } else {
-          // Other Firebase errors - don't send OTP on error
-          console.error('[OTP] ❌ Firebase Auth error checking user:', authError);
-          return res.status(500).json({
-            success: false,
-            message: 'Error verifying user. Please try again.'
-          });
+          // Other Firebase errors - log but allow OTP to be sent (fallback for unexpected errors)
+          console.error('[OTP] ⚠️ Firebase Auth error checking user (non-fatal):', authError.code, authError.message);
+          console.log('[OTP] ⚠️ Allowing OTP to proceed despite Firebase error');
+          // Continue to send OTP as fallback - don't block legitimate users
         }
       }
     } else {

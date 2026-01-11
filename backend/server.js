@@ -71,8 +71,11 @@ app.post('/api/otp/send', async (req, res) => {
 
     // If this is for forgot password, check if user exists first
     if (purpose === 'forgot_password') {
+      console.log(`[OTP] Forgot password request for: ${normalizedEmail}`);
+      
       // Check if Firebase Admin SDK is available
       if (!admin.apps.length) {
+        console.error('[OTP] Firebase Admin SDK not initialized');
         return res.status(503).json({
           success: false,
           message: 'Firebase Admin SDK not initialized. Cannot verify user existence.'
@@ -81,11 +84,13 @@ app.post('/api/otp/send', async (req, res) => {
 
       try {
         // Check if user exists in Firebase Auth
-        await admin.auth().getUserByEmail(normalizedEmail);
-        // User exists, proceed with OTP
+        const userRecord = await admin.auth().getUserByEmail(normalizedEmail);
+        console.log(`[OTP] User found: ${userRecord.uid} - Proceeding with OTP`);
+        // User exists, proceed with OTP generation below
       } catch (authError) {
         if (authError.code === 'auth/user-not-found') {
           // User doesn't exist - don't send OTP (security: prevent email enumeration)
+          console.log(`[OTP] User NOT found for: ${normalizedEmail} - NOT sending OTP`);
           // Return generic message to prevent email enumeration attacks
           return res.status(200).json({
             success: true,
@@ -94,13 +99,15 @@ app.post('/api/otp/send', async (req, res) => {
           });
         } else {
           // Other Firebase errors
-          console.error('Firebase Auth error checking user:', authError);
+          console.error('[OTP] Firebase Auth error checking user:', authError);
           return res.status(500).json({
             success: false,
             message: 'Error verifying user. Please try again.'
           });
         }
       }
+    } else {
+      console.log(`[OTP] Regular OTP request (purpose: ${purpose || 'none'}) for: ${normalizedEmail}`);
     }
 
     // Generate 6-digit OTP

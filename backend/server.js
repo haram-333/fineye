@@ -89,13 +89,11 @@ app.post('/api/otp/send', async (req, res) => {
         // User exists, proceed with OTP generation below
       } catch (authError) {
         if (authError.code === 'auth/user-not-found') {
-          // User doesn't exist - don't send OTP (security: prevent email enumeration)
-          console.log(`[OTP] User NOT found for: ${normalizedEmail} - NOT sending OTP`);
-          // Return generic message to prevent email enumeration attacks
-          return res.status(200).json({
-            success: true,
-            message: 'If this email is registered, you will receive an OTP shortly.',
-            expiresIn: 600
+          // User doesn't exist - return error and don't send OTP
+          console.log(`[OTP] User NOT found for: ${normalizedEmail} - Returning error, NOT sending OTP`);
+          return res.status(404).json({
+            success: false,
+            message: 'No account found with this email address. Please check your email or register a new account.'
           });
         } else {
           // Other Firebase errors

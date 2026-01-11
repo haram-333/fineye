@@ -59,6 +59,9 @@ app.get('/health', async (req, res) => {
 app.post('/api/otp/send', async (req, res) => {
   try {
     const { email, purpose } = req.body;
+    
+    // Debug: Log the entire request body
+    console.log('[OTP] Full request body:', JSON.stringify(req.body));
 
     if (!email) {
       return res.status(400).json({ 

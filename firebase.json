@@ -1,0 +1,37 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "fineye-app",
+          "appId": "1:236162384586:android:abd67a3922feae2e2d6a33",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "fineye-app",
+          "configurations": {
+            "android": "1:236162384586:android:abd67a3922feae2e2d6a33",
+            "ios": "1:236162384586:ios:a2ae5969b25575732d6a33",
+            "macos": "1:236162384586:ios:a2ae5969b25575732d6a33",
+            "web": "1:236162384586:web:fb8074e08f58118a2d6a33",
+            "windows": "1:236162384586:web:a4f6290d86b83b452d6a33"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" run lint"
+    ],
+    "source": "functions"
+  }
+}

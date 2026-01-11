@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // User invoices storage - Users can only access their own invoice images
+    // Path structure: user_invoices/{userId}/{invoiceId}.jpg
+    match /user_invoices/{userId}/{allPaths=**} {
+      // Read: User must be authenticated and own the path
+      allow read: if isOwner(userId);
+      
+      // Write: User must be authenticated and own the path
+      allow write: if isOwner(userId)
+        && request.resource.size < 10 * 1024 * 1024  // 10MB limit
+        && request.resource.contentType.matches('image/.*');  // Only images
+      
+      // Delete: User must be authenticated and own the path
+      allow delete: if isOwner(userId);
+    }
+    
+    // Default: Deny all other access (production security)
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+

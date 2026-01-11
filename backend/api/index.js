@@ -419,10 +419,14 @@ app.post('/api/otp/send', async (req, res) => {
             message: 'No account found with this email address. Please check your email or register a new account.'
           });
         } else {
-          // Other Firebase errors - log but allow OTP to be sent (fallback for unexpected errors)
-          console.error('[OTP] ⚠️ Firebase Auth error checking user (non-fatal):', authError.code, authError.message);
-          console.log('[OTP] ⚠️ Allowing OTP to proceed despite Firebase error');
-          // Continue to send OTP as fallback - don't block legitimate users
+          // Other Firebase errors (permission denied, internal errors, etc.) - block OTP for security
+          // We can't verify the user exists, so we must block to prevent sending OTP to unregistered emails
+          console.error('[OTP] ❌ Firebase Auth error checking user - BLOCKING OTP for security:', authError.code);
+          console.error('[OTP] ❌ Error details:', authError.message);
+          return res.status(500).json({
+            success: false,
+            message: 'Unable to verify your email address. Please try again later or contact support if the issue persists.'
+          });
         }
       }
     } else {

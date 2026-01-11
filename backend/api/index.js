@@ -372,7 +372,7 @@ app.get('/health', async (req, res) => {
 // Send OTP endpoint
 app.post('/api/otp/send', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, purpose } = req.body;
 
     if (!email) {
       return res.status(400).json({ 
@@ -383,6 +383,52 @@ app.post('/api/otp/send', async (req, res) => {
 
     // Normalize email to lowercase for consistent storage
     const normalizedEmail = email.trim().toLowerCase();
+    
+    // Log incoming request details
+    console.log(`[OTP] Request received - Email: ${normalizedEmail}, Purpose: ${purpose || 'none'}`);
+    console.log('[OTP] Full request body:', JSON.stringify(req.body));
+
+    // If this is for forgot password, check if user exists first
+    if (purpose === 'forgot_password') {
+      console.log(`[OTP] Forgot password flow - Checking if user exists: ${normalizedEmail}`);
+      
+      // Check if Firebase Admin SDK is available
+      if (!admin.apps || admin.apps.length === 0) {
+        console.error('[OTP] ❌ Firebase Admin SDK NOT initialized - Cannot verify user');
+        return res.status(503).json({
+          success: false,
+          message: 'Firebase Admin SDK not initialized. Cannot verify user existence.'
+        });
+      }
+
+      try {
+        // Check if user exists in Firebase Auth
+        console.log(`[OTP] Checking Firebase Auth for user: ${normalizedEmail}`);
+        const userRecord = await admin.auth().getUserByEmail(normalizedEmail);
+        console.log(`[OTP] ✅ User found: ${userRecord.uid} - Email: ${userRecord.email} - Proceeding with OTP`);
+        // User exists, proceed with OTP generation below
+      } catch (authError) {
+        console.error(`[OTP] Firebase Auth error:`, authError.code, authError.message);
+        
+        if (authError.code === 'auth/user-not-found') {
+          // User doesn't exist - return error and don't send OTP
+          console.log(`[OTP] ❌ User NOT found for: ${normalizedEmail} - Returning error, NOT sending OTP`);
+          return res.status(404).json({
+            success: false,
+            message: 'No account found with this email address. Please check your email or register a new account.'
+          });
+        } else {
+          // Other Firebase errors - don't send OTP on error
+          console.error('[OTP] ❌ Firebase Auth error checking user:', authError);
+          return res.status(500).json({
+            success: false,
+            message: 'Error verifying user. Please try again.'
+          });
+        }
+      }
+    } else {
+      console.log(`[OTP] Regular OTP request (purpose: ${purpose || 'none'}) - No user verification required for: ${normalizedEmail}`);
+    }
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();

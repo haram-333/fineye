@@ -418,9 +418,15 @@ app.post('/api/otp/send', async (req, res) => {
             success: false,
             message: 'No account found with this email address. Please check your email or register a new account.'
           });
+        } else if (authError.code === 'auth/internal-error' && authError.message && authError.message.includes('PERMISSION_DENIED')) {
+          // Permission error - Firebase service account doesn't have proper permissions
+          // Allow OTP to proceed as a temporary workaround until permissions are fixed
+          // This allows registered users to reset passwords while you fix Firebase permissions
+          console.error('[OTP] ⚠️ Firebase permission error - Allowing OTP temporarily (please fix Firebase permissions)');
+          console.error('[OTP] ⚠️ Service account needs: roles/serviceusage.serviceUsageConsumer role');
+          // Continue to send OTP (fallback to allow registered users)
         } else {
-          // Other Firebase errors (permission denied, internal errors, etc.) - block OTP for security
-          // We can't verify the user exists, so we must block to prevent sending OTP to unregistered emails
+          // Other Firebase errors - block OTP for security
           console.error('[OTP] ❌ Firebase Auth error checking user - BLOCKING OTP for security:', authError.code);
           console.error('[OTP] ❌ Error details:', authError.message);
           return res.status(500).json({

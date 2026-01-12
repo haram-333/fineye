@@ -47,13 +47,15 @@ class ComplianceStatusService extends GetxService {
       return;
     }
     
-    // 🟡 AMBER: Action needed
-    if (hasUnreviewedInvoices.value || hasActiveRisks.value || !isTaxPeriodComplete.value) {
+    // 🟡 AMBER: Action needed - ONLY if there are unpaid invoices
+    // Removed isTaxPeriodComplete check - it was causing false positives
+    // Action needed should only show when there are actual unpaid invoices to review
+    if (hasUnreviewedInvoices.value) {
       currentStatus.value = ComplianceStatus.actionNeeded;
       return;
     }
     
-    // 🟢 GREEN: Ready to file - only if ALL checks pass
+    // 🟢 GREEN: Ready to file - all invoices are paid/reviewed
     currentStatus.value = ComplianceStatus.readyToFile;
   }
 

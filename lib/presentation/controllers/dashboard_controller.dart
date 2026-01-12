@@ -104,11 +104,17 @@ class DashboardController extends GetxController {
     // Listen for changes to invoices and update dashboard data
     final invoiceController = Get.find<InvoiceListController>();
     ever(invoiceController.invoices, (_) {
+      print('📊 Dashboard: Invoices changed, recalculating totals...');
       _syncComplianceData();
       _calculateTotalsFromInvoices(invoiceController.invoices);
+      _updateDeadlineDates(); // Also update deadlines when invoices change
     });
     
-    // Load dashboard data
+    // Initial calculation (invoices might be empty at first, but will update when loaded)
+    _syncComplianceData();
+    _calculateTotalsFromInvoices(invoiceController.invoices);
+    
+    // Load dashboard data (deadlines, notifications, etc.)
     loadDashboardData();
     _checkCompanySetup();
   }
@@ -137,6 +143,10 @@ class DashboardController extends GetxController {
         totalRisks: totalRisks,
         highRisks: highRisks,
       );
+      
+      // Set tax period as complete if there are invoices (assuming period is complete for now)
+      // In a real app, this would check if the current tax period has ended
+      _complianceService.updateTaxPeriodStatus(true);
     } else {
       // If InvoiceListController is not registered, set safe defaults for empty state
       _complianceService.updateInvoiceStatus(
@@ -147,6 +157,8 @@ class DashboardController extends GetxController {
         totalRisks: 0,
         highRisks: 0,
       );
+      // If no invoices, tax period is considered complete (nothing to file)
+      _complianceService.updateTaxPeriodStatus(true);
     }
   }
   
@@ -179,7 +191,14 @@ class DashboardController extends GetxController {
     
     final invoiceController = Get.find<InvoiceListController>();
     
-    // Calculate real totals from invoices
+    // Ensure invoices are loaded (if not already loading)
+    if (invoiceController.invoices.isEmpty && !invoiceController.isLoading.value) {
+      print('📊 Dashboard: No invoices found, triggering load...');
+      invoiceController.loadInvoices();
+    }
+    
+    print('📊 Dashboard: Calculating totals from ${invoiceController.invoices.length} invoices');
+    // Calculate real totals from invoices (will be recalculated when invoices load via ever() listener)
     _calculateTotalsFromInvoices(invoiceController.invoices);
     
     // Update compliance status from real invoice data
@@ -262,11 +281,14 @@ class DashboardController extends GetxController {
     final currentMonth = now.month;
     final currentYear = now.year;
     
-    // Update month title dynamically
+    // Update month title dynamically (will be updated below if no current month invoices)
     final monthName = DateFormat('MMM').format(now);
-    vatMonthTitle.value = 'Total VAT for $monthName';
+    
+    print('📊 Dashboard: Calculating from ${invoices.length} total invoices');
+    print('📊 Dashboard: Current month/year: $currentMonth/$currentYear');
     
     if (invoices.isEmpty) {
+      print('📊 Dashboard: No invoices, setting defaults');
       // Set default values if no invoices
       vatTotalAmount.value = 'AED 0.00';
       vatOutputAmount.value = 'AED 0.00';
@@ -283,31 +305,54 @@ class DashboardController extends GetxController {
     // Calculate totals
     invoiceCount.value = invoices.length;
     
-    // Filter invoices for CURRENT MONTH only
+    // Filter invoices for CURRENT MONTH only (for VAT filing period)
+    // VAT is typically filed monthly, so show current month's VAT
     final currentMonthInvoices = invoices.where((inv) {
-      return inv.date.year == currentYear && inv.date.month == currentMonth;
+      final isCurrentMonth = inv.date.year == currentYear && inv.date.month == currentMonth;
+      if (isCurrentMonth) {
+        print('📊 Dashboard: Found current month invoice: ${inv.id}, VAT: ${inv.vatAmount}, Date: ${inv.date}');
+      }
+      return isCurrentMonth;
     }).toList();
     
-    // Total expenses (gross amounts) for current month
-    totalExpenses.value = currentMonthInvoices.fold(0.0, (sum, inv) => sum + inv.grossAmount);
+    print('📊 Dashboard: Found ${currentMonthInvoices.length} invoices for current month out of ${invoices.length} total');
     
-    // Total VAT for current month
-    totalVAT.value = currentMonthInvoices.fold(0.0, (sum, inv) => sum + inv.vatAmount);
+    // If no invoices in current month, show ALL invoices' VAT (for visibility)
+    // This helps when user has invoices from previous months
+    final invoicesToUse = currentMonthInvoices.isEmpty ? invoices : currentMonthInvoices;
+    final periodLabel = currentMonthInvoices.isEmpty 
+        ? 'All Time' 
+        : monthName;
     
-    // Pending invoices count (unpaid invoices)
+    // Update month title - show "All Time" if no current month invoices
+    vatMonthTitle.value = 'Total VAT for $periodLabel';
+    
+    // Total expenses (gross amounts)
+    totalExpenses.value = invoicesToUse.fold(0.0, (sum, inv) => sum + inv.grossAmount);
+    
+    // Total VAT
+    totalVAT.value = invoicesToUse.fold(0.0, (sum, inv) => sum + inv.vatAmount);
+    
+    print('📊 Dashboard: Total VAT calculated: ${totalVAT.value} from ${invoicesToUse.length} invoices');
+    
+    // Pending invoices count (unpaid invoices) - ALL invoices, not just current month
     final unpaidCount = invoices.where((inv) => inv.status != 'Paid').length;
     vatPendingCount.value = unpaidCount.toString();
     unverifiedInvoiceCount.value = unpaidCount;
     
-    // VAT Input (from purchases/invoices) for current month - assuming all invoices are purchases for now
-    final inputVat = currentMonthInvoices.fold(0.0, (sum, inv) => sum + inv.vatAmount);
+    print('📊 Dashboard: Unpaid invoices count: $unpaidCount');
+    
+    // VAT Input (from purchases/invoices) - assuming all invoices are purchases for now
+    final inputVat = invoicesToUse.fold(0.0, (sum, inv) => sum + inv.vatAmount);
     
     // VAT Output - would need separate sales invoices, for now assume 0
     // In a real app, you'd filter invoices by type (purchase vs sales)
     final outputVat = 0.0;
     
     // VAT Total = Sum of all VAT amounts from invoices (what user sees as "Total VAT")
-    final vatTotal = currentMonthInvoices.fold(0.0, (sum, inv) => sum + inv.vatAmount);
+    final vatTotal = invoicesToUse.fold(0.0, (sum, inv) => sum + inv.vatAmount);
+    
+    print('📊 Dashboard: VAT Total: $vatTotal');
     
     // Format amounts
     vatTotalAmount.value = _formatAmount(vatTotal); // Show total VAT from invoices
@@ -315,11 +360,13 @@ class DashboardController extends GetxController {
     vatOutputAmount.value = _formatAmount(outputVat);
     vatAdjustmentsAmount.value = 'AED 0.00';
     
-    // Calculate Corporate Tax Total from CT deductible invoices
+    // Calculate Corporate Tax Total from CT deductible invoices (ALL invoices, not just current month)
     // CT deductible = invoices where isCtDeductible is true
     final ctDeductibleInvoices = invoices.where((inv) => inv.isCtDeductible).toList();
     final ctTotal = ctDeductibleInvoices.fold(0.0, (sum, inv) => sum + inv.grossAmount);
     ctTotalAmount.value = _formatAmount(ctTotal);
+    
+    print('📊 Dashboard: CT Total: $ctTotal from ${ctDeductibleInvoices.length} CT deductible invoices');
   }
 
   String _formatAmount(double amount) {

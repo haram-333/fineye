@@ -383,7 +383,7 @@ class InvoiceListView extends GetView<InvoiceListController> {
         return SliverFillRemaining(
           hasScrollBody: false,
           child: Padding(
-            padding: const EdgeInsets.all(40),
+            padding: const EdgeInsets.fromLTRB(40, 40, 40, 140),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

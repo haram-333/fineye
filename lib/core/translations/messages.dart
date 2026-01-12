@@ -443,7 +443,7 @@ class Messages extends Translations {
           'label_breakdown': 'Tax breakdown',
           'label_deadline_vat': 'Next VAT return deadline',
           'label_reminder': "We'll remind you before the filing date.",
-          'label_due_in_days': 'Due in {days} days',
+          'label_due_in_days': 'Due in @days days',
           'label_advance': 'Advance',
 
           
@@ -596,7 +596,7 @@ class Messages extends Translations {
           'label_gross_amount': 'Gross amount:',
           'label_vat_5_percent': 'VAT (5%):',
           'label_formula': 'Formula:',
-          'label_days_ago': '{days} days ago',
+          'label_days_ago': '@days days ago',
           'label_unknown_supplier': 'Unknown supplier',
 
           // Invoice Details
@@ -1032,15 +1032,15 @@ class Messages extends Translations {
           // Notification Time Stamps
           'notif_time_now': 'Now',
           'notif_time_just_now': 'Just now',
-          'notif_time_minutes_ago': '{count} minutes ago',
+          'notif_time_minutes_ago': '@count minutes ago',
           'notif_time_hour_ago': '1 hour ago',
-          'notif_time_hours_ago': '{count} hours ago',
+          'notif_time_hours_ago': '@count hours ago',
           'notif_time_today': 'Today',
           'notif_time_yesterday': 'Yesterday',
-          'notif_time_days_ago': '{count} days ago',
+          'notif_time_days_ago': '@count days ago',
           'notif_time_week_ago': '1 week ago',
-          'notif_time_weeks_ago': '{count} weeks ago',
-          'notif_time_due_in': 'Due in {count} days',
+          'notif_time_weeks_ago': '@count weeks ago',
+          'notif_time_due_in': 'Due in @count days',
           'notif_time_due_today': 'Due today',
           'notif_time_due_tomorrow': 'Due tomorrow',
           'notif_time_overdue': 'Overdue',
@@ -1415,7 +1415,7 @@ class Messages extends Translations {
           'label_breakdown': 'توزيع الضريبة',
           'label_deadline_vat': 'الموعد النهائي لتقديم VAT',
           'label_reminder': 'سنقوم بتذكيرك قبل تاريخ التقديم.',
-          'label_due_in_days': 'مستحق خلال {days} يوم',
+          'label_due_in_days': 'مستحق خلال @days يوم',
           'label_advance': 'دفعة مقدمة',
 
           
@@ -1605,7 +1605,7 @@ class Messages extends Translations {
           'label_gross_amount': 'المبلغ الإجمالي:',
           'label_vat_5_percent': 'الضريبة (5%):',
           'label_formula': 'الصيغة:',
-          'label_days_ago': 'منذ {days} يوم',
+          'label_days_ago': 'منذ @days يوم',
           'label_unknown_supplier': 'مورد غير معروف',
 
           // Invoice Details
@@ -2175,15 +2175,15 @@ class Messages extends Translations {
           // Notification Time Stamps
           'notif_time_now': 'الآن',
           'notif_time_just_now': 'الآن',
-          'notif_time_minutes_ago': 'منذ {count} دقيقة',
+          'notif_time_minutes_ago': 'منذ @count دقيقة',
           'notif_time_hour_ago': 'منذ ساعة',
-          'notif_time_hours_ago': 'منذ {count} ساعة',
+          'notif_time_hours_ago': 'منذ @count ساعة',
           'notif_time_today': 'اليوم',
           'notif_time_yesterday': 'أمس',
-          'notif_time_days_ago': 'منذ {count} يوم',
+          'notif_time_days_ago': 'منذ @count يوم',
           'notif_time_week_ago': 'منذ أسبوع',
-          'notif_time_weeks_ago': 'منذ {count} أسبوع',
-          'notif_time_due_in': 'مستحق خلال {count} يوم',
+          'notif_time_weeks_ago': 'منذ @count أسبوع',
+          'notif_time_due_in': 'مستحق خلال @count يوم',
           'notif_time_due_today': 'مستحق اليوم',
           'notif_time_due_tomorrow': 'مستحق غدًا',
           'notif_time_overdue': 'متأخر',

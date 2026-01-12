@@ -105,6 +105,10 @@ class InvoiceDetailsView extends GetView<InvoiceDetailsController> {
               _buildCtDeductible(),
               const SizedBox(height: 20),
               
+              // 10.5. Payment Status
+              _buildPaymentStatusSection(),
+              const SizedBox(height: 20),
+              
               // 11. Notes
               _buildNotesSection(),
               const SizedBox(height: 20),
@@ -1198,6 +1202,99 @@ class InvoiceDetailsView extends GetView<InvoiceDetailsController> {
             onChanged: (val) => controller.isCtDeductible.value = val,
             activeColor: const Color(0xFF1E6FFF),
           )),
+        ],
+      ),
+    );
+  }
+
+  // 10.5. Payment Status
+  Widget _buildPaymentStatusSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Payment Status',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF111827)),
+          ),
+          const SizedBox(height: 16),
+          // Radio buttons for Paid/Not Paid
+          Obx(() => Row(
+            children: [
+              _buildPaymentRadioOption('Paid', true),
+              const SizedBox(width: 24),
+              _buildPaymentRadioOption('Not Paid', false),
+            ],
+          )),
+          const SizedBox(height: 16),
+          // Due date picker (only show when Not Paid is selected)
+          Obx(() {
+            if (controller.isPaid.value) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Due Date',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF6B7280)),
+                ),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: controller.selectDueDate,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          controller.dueDate.value != null
+                              ? DateFormat('dd MMM yyyy').format(controller.dueDate.value!)
+                              : 'Select due date',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: controller.dueDate.value != null 
+                                ? const Color(0xFF111827) 
+                                : const Color(0xFF9CA3AF),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Icon(Icons.calendar_today, size: 18, color: Color(0xFF9CA3AF)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentRadioOption(String label, bool value) {
+    return GestureDetector(
+      onTap: () => controller.isPaid.value = value,
+      child: Row(
+        children: [
+          Icon(
+            controller.isPaid.value == value ? Icons.radio_button_checked : Icons.radio_button_off,
+            color: controller.isPaid.value == value ? const Color(0xFF1E6FFF) : const Color(0xFF9CA3AF),
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF374151))),
         ],
       ),
     );

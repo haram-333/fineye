@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:intl/intl.dart';
 import '../../../data/models/invoice_model.dart';
 import '../../../data/repositories/user_invoice_repository.dart';
 import '../../../data/services/section_based_invoice_extractor.dart';
@@ -58,6 +57,10 @@ class InvoiceDetailsController extends GetxController {
   double get finalTotal => grossAmount.value + additionalCharges.value; // Delivery, service charges, etc.
   final RxBool isCtDeductible = true.obs;
   final RxBool showOriginalInvoice = true.obs;
+  
+  // Payment Status
+  final RxBool isPaid = false.obs; // true = Paid, false = Not Paid
+  final Rx<DateTime?> dueDate = Rx<DateTime?>(null); // Due date when not paid
 
   // Validation
   final RxBool vatValid = true.obs;
@@ -202,6 +205,16 @@ class InvoiceDetailsController extends GetxController {
     // Only load if we have an existing invoice with real data
     if (!isNewInvoice) {
       _loadInvoiceData();
+    } else {
+      // For new invoices, initialize payment status based on date
+      // If date is in the future, set to Not Paid
+      final invoiceDateValue = invoiceDate.value;
+      if (invoiceDateValue != null && invoiceDateValue.isAfter(DateTime.now())) {
+        isPaid.value = false;
+      } else {
+        // Default to Not Paid for new invoices
+        isPaid.value = false;
+      }
     }
 
     // Setup controller sync with reactive values
@@ -261,7 +274,7 @@ class InvoiceDetailsController extends GetxController {
       grossAmount.value != invoice.grossAmount ||
       additionalCharges.value != invoice.additionalCharges ||
       isCtDeductible.value != invoice.isCtDeductible ||
-      notesController.text != (invoice.notes ?? '');
+      notesController.text != invoice.notes;
   }
 
   /// DISABLED - Document AI structured data is unreliable
@@ -615,6 +628,10 @@ class InvoiceDetailsController extends GetxController {
     invoiceDate.value = invoice.date;
     selectedCategory.value = invoice.category;
     isCtDeductible.value = invoice.isCtDeductible;
+    
+    // Initialize payment status from invoice
+    isPaid.value = invoice.status == 'Paid';
+    dueDate.value = invoice.dueDate;
 
     grossAmount.value = invoice.grossAmount;
     vatAmount.value = invoice.vatAmount;
@@ -848,11 +865,12 @@ class InvoiceDetailsController extends GetxController {
         grossAmount: grossAmount.value,
         vatAmount: vatAmount.value,
         additionalCharges: additionalCharges.value,
-        status: invoice.status,
+        status: _determineInvoiceStatus(),
         taxBadge: invoice.taxBadge,
         notes: notesController.text,
         isCtDeductible: isCtDeductible.value,
         vatActivity: invoice.vatActivity,
+        dueDate: isPaid.value ? null : dueDate.value,
         risks: const [],
       );
 
@@ -897,11 +915,12 @@ class InvoiceDetailsController extends GetxController {
         grossAmount: grossAmount.value,
         vatAmount: vatAmount.value,
         additionalCharges: additionalCharges.value,
-        status: invoice.status,
+        status: _determineInvoiceStatus(),
         taxBadge: invoice.taxBadge,
         notes: notesController.text,
         isCtDeductible: isCtDeductible.value,
         vatActivity: invoice.vatActivity,
+        dueDate: isPaid.value ? null : dueDate.value,
         userId: finalUserId,
         imageUrl: invoice.imageUrl,
         firestoreDocId: invoice.firestoreDocId,
@@ -995,11 +1014,12 @@ class InvoiceDetailsController extends GetxController {
         grossAmount: grossAmount.value,
         vatAmount: vatAmount.value,
         additionalCharges: additionalCharges.value,
-        status: 'Approved',
+        status: _determineInvoiceStatus(),
         taxBadge: 'VAT 5%',
         notes: notesController.text,
         isCtDeductible: isCtDeductible.value,
         vatActivity: 'Low',
+        dueDate: isPaid.value ? null : dueDate.value,
         userId: currentUser.uid,
         imageUrl: null,
         risks: risks.toList(),
@@ -1112,6 +1132,38 @@ class InvoiceDetailsController extends GetxController {
         'Error',
         errorMessage,
       );
+    }
+  }
+
+  /// Determine invoice status based on payment status
+  String _determineInvoiceStatus() {
+    if (isPaid.value) {
+      return 'Paid';
+    } else {
+      // If due date is set and hasn't passed, it's Pending
+      if (dueDate.value != null && dueDate.value!.isAfter(DateTime.now())) {
+        return 'Pending';
+      }
+      // If due date is set and has passed, it's Pending (overdue)
+      if (dueDate.value != null && dueDate.value!.isBefore(DateTime.now())) {
+        return 'Pending';
+      }
+      // If no due date but not paid, default to Pending
+      return 'Pending';
+    }
+  }
+  
+  /// Select due date (called from UI)
+  Future<void> selectDueDate() async {
+    final picked = await showDatePicker(
+      context: Get.context!,
+      initialDate: dueDate.value ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      dueDate.value = picked;
+      _checkForChanges();
     }
   }
 

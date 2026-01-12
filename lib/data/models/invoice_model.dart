@@ -64,6 +64,7 @@ class Invoice {
   final String notes;
   final bool isCtDeductible;
   final String vatActivity; // High, Medium, Low
+  final DateTime? dueDate; // Due date for unpaid invoices
 
   /// Optional Firestore user id (uid) of the owner of this invoice.
   /// Used for the `user_invoices` collection to scope invoices per user.
@@ -97,6 +98,7 @@ class Invoice {
     required this.notes,
     required this.isCtDeductible,
     required this.vatActivity,
+    this.dueDate,
     this.userId = '',
     this.imageUrl,
     this.firestoreDocId,
@@ -123,6 +125,7 @@ class Invoice {
       'notes': notes,
       'isCtDeductible': isCtDeductible,
       'vatActivity': vatActivity,
+      'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
       'userId': userId,
       'imageUrl': imageUrl,
       'risks': risks.map((r) => r.toMap()).toList(),
@@ -147,6 +150,7 @@ class Invoice {
       notes: map['notes'] ?? '',
       isCtDeductible: map['isCtDeductible'] ?? true,
       vatActivity: map['vatActivity'] ?? 'Low',
+      dueDate: (map['dueDate'] as Timestamp?)?.toDate(),
       userId: map['userId'] ?? '',
       imageUrl: map['imageUrl'] as String?,
       firestoreDocId: documentId, // Store the Firestore document ID
@@ -178,6 +182,7 @@ class Invoice {
     String? notes,
     bool? isCtDeductible,
     String? vatActivity,
+    DateTime? dueDate,
     List<InvoiceRisk>? risks,
     String? userId,
     String? imageUrl,
@@ -197,6 +202,7 @@ class Invoice {
       notes: notes ?? this.notes,
       isCtDeductible: isCtDeductible ?? this.isCtDeductible,
       vatActivity: vatActivity ?? this.vatActivity,
+      dueDate: dueDate ?? this.dueDate,
       userId: userId ?? this.userId,
       imageUrl: imageUrl ?? this.imageUrl,
       firestoreDocId: firestoreDocId ?? this.firestoreDocId,

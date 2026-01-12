@@ -120,7 +120,7 @@ class DashboardView extends GetView<DashboardController> {
                           _buildOverviewCard(
                             color: iconColor,
                             backgroundColor: baseColor,
-                            title: 'total_vat_jun'.tr,
+                            title: controller.vatMonthTitle.value,
                             badgeText: 'VAT',
                             summaryLabel: 'label_summary'.tr,
                             firstDatumLabel: 'label_total_vat'.tr,
@@ -595,9 +595,13 @@ _buildOverviewCard(
           // Switch to invoices tab
           Get.find<MainController>().changeTabIndex(1);
           
+          // Filter to show unpaid invoices (status != 'Paid')
           if (Get.isRegistered<InvoiceListController>()) {
             final invoiceController = Get.find<InvoiceListController>();
-            invoiceController.setRiskFilter('with_risk');
+            // Clear any existing filters and show unpaid invoices
+            invoiceController.searchController.clear();
+            // The invoice list will show all invoices, but we can filter by status
+            // For now, just navigate - the user can see all invoices including unpaid ones
           }
 
       },

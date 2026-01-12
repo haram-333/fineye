@@ -21,10 +21,30 @@ class InvoiceListController extends GetxController {
   // Risk Filter: all / with risk / no risk
   final RxString riskFilter = 'all'.obs;
 
+  // Advanced Filters (from InvoiceFiltersController)
+  final Rx<DateTime?> filterStartDate = Rx<DateTime?>(null);
+  final Rx<DateTime?> filterEndDate = Rx<DateTime?>(null);
+  final RxString filterSupplier = ''.obs;
+  final RxString filterCategory = ''.obs;
+  final RxList<String> filterStatuses = <String>[].obs;
+  final RxString filterTaxType = 'All tax types'.obs;
+  final RxDouble filterMinAmount = RxDouble(0.0);
+  final RxDouble filterMaxAmount = RxDouble(0.0);
+
+  // Saved Filters
+  final RxList<Map<String, dynamic>> savedFilters = <Map<String, dynamic>>[].obs;
+  final RxString defaultFilterName = 'VAT review'.obs;
+
   // Data
   final RxList<Invoice> invoices = <Invoice>[].obs;
   final RxList<Invoice> filteredInvoices = <Invoice>[].obs;
   final RxBool isLoading = false.obs;
+  
+  // Get saved filters count
+  int get savedFiltersCount => savedFilters.length;
+  
+  // Get default filter name
+  String get defaultFilterDisplayName => defaultFilterName.value;
 
   int get totalFlaggedInvoices =>
       invoices.where((inv) => inv.hasRisk).length;
@@ -58,6 +78,7 @@ class InvoiceListController extends GetxController {
   void onInit() {
     super.onInit();
     loadInvoices();
+    loadSavedFilters();
 
     // Listen to search & filters
     searchController.addListener(() {
@@ -65,6 +86,14 @@ class InvoiceListController extends GetxController {
       _applyFilters();
     });
     ever(riskFilter, (_) => _applyFilters());
+    ever(filterStartDate, (_) => _applyFilters());
+    ever(filterEndDate, (_) => _applyFilters());
+    ever(filterSupplier, (_) => _applyFilters());
+    ever(filterCategory, (_) => _applyFilters());
+    ever(filterStatuses, (_) => _applyFilters());
+    ever(filterTaxType, (_) => _applyFilters());
+    ever(filterMinAmount, (_) => _applyFilters());
+    ever(filterMaxAmount, (_) => _applyFilters());
   }
 
   @override
@@ -242,6 +271,7 @@ class InvoiceListController extends GetxController {
   void _applyFilters() {
     var result = invoices.toList();
 
+    // Apply search query
     if (searchQuery.value.isNotEmpty) {
       final query = searchQuery.value.toLowerCase();
       result = result
@@ -252,13 +282,41 @@ class InvoiceListController extends GetxController {
           .toList();
     }
 
+    // Apply risk filter
     if (riskFilter.value == 'with_risk') {
       result = result.where((inv) => inv.hasRisk).toList();
     } else if (riskFilter.value == 'no_risk') {
       result = result.where((inv) => !inv.hasRisk).toList();
     }
 
+    // Apply advanced filters from InvoiceFiltersController
+    if (filterStartDate.value != null) {
+      result = result.where((inv) => inv.date.isAfter(filterStartDate.value!.subtract(const Duration(days: 1)))).toList();
+    }
+    if (filterEndDate.value != null) {
+      result = result.where((inv) => inv.date.isBefore(filterEndDate.value!.add(const Duration(days: 1)))).toList();
+    }
+    if (filterSupplier.value.isNotEmpty && filterSupplier.value != 'All suppliers') {
+      result = result.where((inv) => inv.supplierName == filterSupplier.value).toList();
+    }
+    if (filterCategory.value.isNotEmpty && filterCategory.value != 'All categories') {
+      result = result.where((inv) => inv.category == filterCategory.value).toList();
+    }
+    if (filterStatuses.isNotEmpty) {
+      result = result.where((inv) => filterStatuses.contains(inv.status)).toList();
+    }
+    if (filterTaxType.value != 'All tax types') {
+      result = result.where((inv) => inv.taxBadge == filterTaxType.value).toList();
+    }
+    if (filterMinAmount.value > 0) {
+      result = result.where((inv) => inv.grossAmount >= filterMinAmount.value).toList();
+    }
+    if (filterMaxAmount.value > 0) {
+      result = result.where((inv) => inv.grossAmount <= filterMaxAmount.value).toList();
+    }
+
     filteredInvoices.assignAll(result);
+    print('🔍 Applied filters: ${result.length} invoices shown out of ${invoices.length} total');
   }
 
   Future<void> toggleFlag(Invoice invoice) async {
@@ -281,17 +339,67 @@ class InvoiceListController extends GetxController {
 
   void showFilterOptions() async {
     final result = await Get.toNamed(AppRoutes.invoiceFilters);
-    if (result != null) {
-      // Logic to apply filters would go here
-      // For now, we just acknowledge the return
-      if (result is Map) {
-        // Example: supplier = result['supplier']
-      }
+    if (result != null && result is Map) {
+      // Apply filters from result
+      filterStartDate.value = result['startDate'] as DateTime?;
+      filterEndDate.value = result['endDate'] as DateTime?;
+      filterSupplier.value = result['supplier'] as String? ?? '';
+      filterCategory.value = result['category'] as String? ?? '';
+      filterStatuses.assignAll((result['statuses'] as List<dynamic>?)?.cast<String>() ?? []);
+      filterTaxType.value = result['taxType'] as String? ?? 'All tax types';
+      
+      // Parse amount filters
+      final minAmountStr = result['minAmount'] as String? ?? '';
+      final maxAmountStr = result['maxAmount'] as String? ?? '';
+      filterMinAmount.value = minAmountStr.isNotEmpty ? double.tryParse(minAmountStr) ?? 0.0 : 0.0;
+      filterMaxAmount.value = maxAmountStr.isNotEmpty ? double.tryParse(maxAmountStr) ?? 0.0 : 0.0;
+      
+      // Reapply filters
+      _applyFilters();
+      
       SnackbarService.to.showInfo(
         'title_filters_applied'.tr, 
-        'msg_filters_received'.tr,
+        'Filters applied successfully',
       );
     }
+  }
+  
+  void loadSavedFilters() {
+    // Load saved filters from SharedPreferences or Firestore
+    // For now, initialize with default filter
+    if (savedFilters.isEmpty) {
+      savedFilters.add({
+        'name': 'VAT review',
+        'isDefault': true,
+        'filters': {
+          'statuses': ['Pending', 'Review'],
+          'taxType': 'VAT 5%',
+        },
+      });
+      defaultFilterName.value = 'VAT review';
+    }
+  }
+  
+  void saveCurrentFilter(String name) {
+    final filter = {
+      'name': name,
+      'isDefault': savedFilters.isEmpty,
+      'filters': {
+        'startDate': filterStartDate.value?.millisecondsSinceEpoch,
+        'endDate': filterEndDate.value?.millisecondsSinceEpoch,
+        'supplier': filterSupplier.value,
+        'category': filterCategory.value,
+        'statuses': filterStatuses.toList(),
+        'taxType': filterTaxType.value,
+        'minAmount': filterMinAmount.value,
+        'maxAmount': filterMaxAmount.value,
+      },
+    };
+    savedFilters.add(filter);
+    if (filter['isDefault'] == true) {
+      defaultFilterName.value = name;
+    }
+    // TODO: Persist to SharedPreferences or Firestore
   }
 
   Future<void> exportInvoices() async {

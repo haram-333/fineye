@@ -186,10 +186,16 @@ class InvoiceListView extends GetView<InvoiceListController> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            'filter_presets'.tr,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
+          child: Obx(() {
+            final count = controller.savedFiltersCount;
+            final defaultName = controller.defaultFilterDisplayName;
+            return Text(
+              count > 0 
+                  ? '$count ${'presets'.tr} • ${'default'.tr}: $defaultName'
+                  : 'no_saved_filters'.tr,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            );
+          }),
         ),
       ],
     );

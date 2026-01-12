@@ -107,7 +107,8 @@ class DashboardController extends GetxController {
       print('📊 Dashboard: Invoices changed, recalculating totals...');
       _syncComplianceData();
       _calculateTotalsFromInvoices(invoiceController.invoices);
-      _updateDeadlineDates(); // Also update deadlines when invoices change
+      _calculateDeadlinesFromInvoices(invoiceController.invoices); // Recalculate deadlines from invoices
+      _updateDeadlineDates(); // Also update deadline display when invoices change
     });
     
     // Initial calculation (invoices might be empty at first, but will update when loaded)
@@ -204,16 +205,8 @@ class DashboardController extends GetxController {
     // Update compliance status from real invoice data
     updateComplianceFromInvoices();
 
-    // Calculate deadlines (default to end of current month + 28 days for VAT, end of quarter for CT)
-    final now = DateTime.now();
-    final currentMonthEnd = DateTime(now.year, now.month + 1, 0); // Last day of current month
-    vatDeadline.value = currentMonthEnd.add(const Duration(days: 28)); // VAT due 28 days after month end
-    
-    // CT deadline: end of current quarter + 30 days
-    final currentQuarter = ((now.month - 1) ~/ 3) + 1;
-    final quarterEndMonth = currentQuarter * 3;
-    final quarterEnd = DateTime(now.year, quarterEndMonth + 1, 0);
-    ctDeadline.value = quarterEnd.add(const Duration(days: 30));
+    // Calculate deadlines from pending invoices
+    _calculateDeadlinesFromInvoices(invoiceController.invoices);
     
     // Update deadline dates and days left
     _updateDeadlineDates();
@@ -226,13 +219,66 @@ class DashboardController extends GetxController {
     );
   }
   
+  void _calculateDeadlinesFromInvoices(List<Invoice> invoices) {
+    final now = DateTime.now();
+    
+    // Find all pending invoices (status != 'Paid')
+    final pendingInvoices = invoices.where((inv) => inv.status != 'Paid').toList();
+    
+    if (pendingInvoices.isEmpty) {
+      // No pending invoices - set deadlines to null/empty (will be hidden in UI)
+      vatDeadline.value = DateTime(2100, 1, 1); // Far future date as placeholder
+      vatDaysLeftCount.value = 0;
+      vatDeadlineDate.value = '';
+      print('📊 Dashboard: No pending invoices, hiding deadline');
+      return;
+    }
+    
+    // Find the latest due date from pending invoices
+    DateTime? latestDueDate;
+    for (final invoice in pendingInvoices) {
+      if (invoice.dueDate != null) {
+        if (latestDueDate == null || invoice.dueDate!.isAfter(latestDueDate)) {
+          latestDueDate = invoice.dueDate;
+        }
+      }
+    }
+    
+    // If we found a due date, use it; otherwise use invoice date as fallback
+    if (latestDueDate != null) {
+      vatDeadline.value = latestDueDate;
+      print('📊 Dashboard: Latest due date from pending invoices: $latestDueDate');
+    } else {
+      // Fallback: use the latest invoice date from pending invoices
+      final latestInvoiceDate = pendingInvoices.map((inv) => inv.date).reduce((a, b) => a.isAfter(b) ? a : b);
+      vatDeadline.value = latestInvoiceDate;
+      print('📊 Dashboard: No due dates found, using latest invoice date: $latestInvoiceDate');
+    }
+    
+    // CT deadline: end of current quarter + 30 days (keep as is for now)
+    final currentQuarter = ((now.month - 1) ~/ 3) + 1;
+    final quarterEndMonth = currentQuarter * 3;
+    final quarterEnd = DateTime(now.year, quarterEndMonth + 1, 0);
+    ctDeadline.value = quarterEnd.add(const Duration(days: 30));
+  }
+  
   void _updateDeadlineDates() {
     final now = DateTime.now();
     
-    // VAT deadline
-    final vatDaysLeft = vatDeadline.value.difference(now).inDays;
-    vatDaysLeftCount.value = vatDaysLeft > 0 ? vatDaysLeft : 0;
-    vatDeadlineDate.value = 'Due: ${DateFormat('dd MMM yyyy').format(vatDeadline.value)}';
+    // VAT deadline - only show if there are pending invoices
+    final pendingInvoices = Get.isRegistered<InvoiceListController>() 
+        ? Get.find<InvoiceListController>().invoices.where((inv) => inv.status != 'Paid').toList()
+        : <Invoice>[];
+    
+    if (pendingInvoices.isEmpty) {
+      // No pending invoices - hide deadline
+      vatDaysLeftCount.value = 0;
+      vatDeadlineDate.value = '';
+    } else {
+      final vatDaysLeft = vatDeadline.value.difference(now).inDays;
+      vatDaysLeftCount.value = vatDaysLeft > 0 ? vatDaysLeft : 0;
+      vatDeadlineDate.value = 'Due: ${DateFormat('dd MMM yyyy').format(vatDeadline.value)}';
+    }
     
     // CT deadline
     final ctDaysLeft = ctDeadline.value.difference(now).inDays;

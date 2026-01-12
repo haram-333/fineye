@@ -147,28 +147,6 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                               ),
                       ),
                     )),
-                    const SizedBox(height: 24),
-
-                    Obx(() {
-                      if (!controller.isEmailSent.value) return const SizedBox.shrink();
-                      return Column(
-                        children: [
-                          const SizedBox(height: 8),
-                          Center(
-                            child: TextButton(
-                              onPressed: controller.resendOtp,
-                              child: Text(
-                                'resend_email'.tr,
-                                style: const TextStyle(
-                                  color: AppColors.primaryBlue,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
                   ],
                 ),
               ),

@@ -64,6 +64,19 @@ if (!admin.apps.length) {
   console.log('✅ Firebase Admin SDK already initialized');
 }
 
+// Initialize Firestore reference (for user lookups, etc.)
+let firestoreDb = null;
+try {
+  if (admin.apps && admin.apps.length > 0 && admin.firestore) {
+    firestoreDb = admin.firestore();
+    console.log('✅ Firestore initialized for user lookups');
+  } else {
+    console.warn('⚠️ Firestore not initialized - admin SDK not ready');
+  }
+} catch (firestoreError) {
+  console.error('❌ Error initializing Firestore:', firestoreError);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -391,49 +404,45 @@ app.post('/api/otp/send', async (req, res) => {
     // If this is for forgot password, check if user exists first
     if (purpose === 'forgot_password') {
       console.log(`[OTP] Forgot password flow - Checking if user exists: ${normalizedEmail}`);
-      
-      // Check if Firebase Admin SDK is available
-      if (!admin.apps || admin.apps.length === 0) {
-        console.error('[OTP] ❌ Firebase Admin SDK NOT initialized - Cannot verify user');
+
+      // Check if Firestore is available
+      if (!firestoreDb) {
+        console.error('[OTP] ❌ Firestore NOT initialized - Cannot verify user via Firestore');
         return res.status(503).json({
           success: false,
-          message: 'Firebase Admin SDK not initialized. Cannot verify user existence.'
+          message: 'User database not initialized. Cannot verify user existence.'
         });
       }
 
       try {
-        // Check if user exists in Firebase Auth
-        console.log(`[OTP] Checking Firebase Auth for user: ${normalizedEmail}`);
-        const userRecord = await admin.auth().getUserByEmail(normalizedEmail);
-        console.log(`[OTP] ✅ User found: ${userRecord.uid} - Email: ${userRecord.email} - Proceeding with OTP`);
-        // User exists, proceed with OTP generation below (continue to line 433+)
-      } catch (authError) {
-        console.error(`[OTP] Firebase Auth error:`, authError.code, authError.message);
-        console.error(`[OTP] Full error:`, JSON.stringify(authError));
-        
-        if (authError.code === 'auth/user-not-found') {
-          // User doesn't exist - return error and don't send OTP
-          console.log(`[OTP] ❌ User NOT found for: ${normalizedEmail} - Returning error, NOT sending OTP`);
+        // Check if user exists in Firestore "users" collection by email
+        console.log(`[OTP] Checking Firestore 'users' collection for email: ${normalizedEmail}`);
+        const usersSnapshot = await firestoreDb
+          .collection('users')
+          .where('email', '==', normalizedEmail)
+          .limit(1)
+          .get();
+
+        if (usersSnapshot.empty) {
+          // No Firestore user found with this email - do NOT send OTP
+          console.log(`[OTP] ❌ No Firestore user found for email: ${normalizedEmail} - NOT sending OTP`);
           return res.status(404).json({
             success: false,
             message: 'No account found with this email address. Please check your email or register a new account.'
           });
-        } else if (authError.code === 'auth/internal-error' && authError.message && authError.message.includes('PERMISSION_DENIED')) {
-          // Permission error - Firebase service account doesn't have proper permissions
-          // Allow OTP to proceed as a temporary workaround until permissions are fixed
-          // This allows registered users to reset passwords while you fix Firebase permissions
-          console.error('[OTP] ⚠️ Firebase permission error - Allowing OTP temporarily (please fix Firebase permissions)');
-          console.error('[OTP] ⚠️ Service account needs: roles/serviceusage.serviceUsageConsumer role');
-          // Continue to send OTP (fallback to allow registered users)
-        } else {
-          // Other Firebase errors - block OTP for security
-          console.error('[OTP] ❌ Firebase Auth error checking user - BLOCKING OTP for security:', authError.code);
-          console.error('[OTP] ❌ Error details:', authError.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Unable to verify your email address. Please try again later or contact support if the issue persists.'
-          });
         }
+
+        // User exists in Firestore - safe to proceed with OTP generation
+        const userDoc = usersSnapshot.docs[0];
+        console.log(
+          `[OTP] ✅ Firestore user found (docId: ${userDoc.id}) for email: ${normalizedEmail} - Proceeding with OTP`
+        );
+      } catch (firestoreError) {
+        console.error('[OTP] ❌ Firestore error while checking user:', firestoreError);
+        return res.status(500).json({
+          success: false,
+          message: 'Unable to verify your email address. Please try again later.'
+        });
       }
     } else {
       console.log(`[OTP] Regular OTP request (purpose: ${purpose || 'none'}) - No user verification required for: ${normalizedEmail}`);

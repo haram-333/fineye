@@ -6,6 +6,7 @@ const otpService = require('../services/otpService');
 const admin = require('firebase-admin');
 const multer = require('multer');
 const { parseInvoiceWithDocumentAI } = require('./documentaiHelper');
+const { UAEInvoiceExtractor } = require('../services/uae-invoice-extractor');
 
 dotenv.config();
 
@@ -739,7 +740,7 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
     const entities = document?.entities || [];
     const detectedLanguages = document?.pages?.[0]?.detectedLanguages || [];
     
-      // Check for Arabic in the response
+          // Check for Arabic in the response
           if (fullText && fullText.length > 0) {
             const arabicRegex = /[\u0600-\u06FF]/;
             const containsArabic = arabicRegex.test(fullText);
@@ -750,96 +751,116 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
           }
 
           // ---------------------------------------------------------
-          // REQUIRED: Gemini LLM Extraction Layer
+          // UAE RULE-BASED INVOICE EXTRACTION
           // ---------------------------------------------------------
-          // Gemini is now REQUIRED for structured extraction from raw OCR text
-          // It provides consistent, structured JSON regardless of invoice format/variations
-          if (!process.env.GEMINI_API_KEY) {
-            console.error('❌ Gemini API key required but not set');
-            return res.status(500).json({
-              success: false,
-              message: 'Gemini API key not configured for invoice extraction'
-            });
-          }
+          // Using comprehensive rule-based extraction for UAE invoice formats
+          // This provides highly accurate, predictable extraction for all UAE invoice types
 
           if (fullText.length <= 10) {
-            console.error('❌ Not enough OCR text for Gemini processing');
+            console.error('❌ Not enough OCR text for extraction');
             return res.status(400).json({
               success: false,
               message: 'Insufficient text extracted from invoice'
             });
           }
 
-          // Gemini is required, so we always try it
           try {
-            console.log('✨ Gemini: Starting intelligent extraction...');
-            const { GoogleGenerativeAI } = require("@google/generative-ai");
-            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({
-              model: "gemini-1.5-flash",
-              generationConfig: { responseMimeType: "application/json" }
-            });
+            console.log('🔍 UAE Extractor: Starting rule-based extraction...');
 
-            const prompt = `
-              You are an expert invoice data extractor.
-              Extract the following fields from this invoice text and return ONLY a valid JSON object.
+            // Initialize the UAE invoice extractor
+            const extractor = new UAEInvoiceExtractor();
 
-              Fields to extract:
-              - supplier_name (string): Name of the vendor/company/supplier. Be precise.
-              - invoice_date (string): Date of the invoice in YYYY-MM-DD format.
-              - invoice_number (string): The invoice identifier/number.
-              - total_amount (number): The generic total/grand total.
-              - net_amount (number): The amount before tax/VAT.
-              - tax_amount (number): The VAT/Tax amount.
-              - currency (string): The currency code (e.g., AED, USD).
+            // Extract invoice data using comprehensive rules
+            const extractedData = extractor.extract(fullText);
 
-              Rules:
-              - If a field is not found, set it to null.
-              - The text contains Arabic and English. Handle both.
-              - Return CAREFULLY parsed numbers (no commas).
+            console.log('✅ UAE Extractor: Extraction complete!');
+            console.log('📊 Extracted fields:', Object.keys(extractedData).filter(k => extractedData[k] !== null).length);
 
-              Invoice Text:
-              """
-              ${fullText}
-              """
-            `;
+            // Convert to entity format compatible with frontend
+            const entities = [];
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
-            console.log('✨ Gemini: Extraction complete!');
-            console.log('✨ Gemini: Raw response:', text);
-
-            const geminiData = JSON.parse(text);
-
-            // Merge Gemini data into our response structure
-            // We simulate "entities" so the frontend (OCRController) handles it seamlessly
-            if (geminiData) {
-              const geminiEntities = [];
-              if (geminiData.supplier_name) geminiEntities.push({ type: 'supplier_name', value: geminiData.supplier_name, confidence: 0.95 });
-              if (geminiData.invoice_number) geminiEntities.push({ type: 'invoice_id', value: geminiData.invoice_number, confidence: 0.95 });
-              if (geminiData.invoice_date) geminiEntities.push({ type: 'invoice_date', value: geminiData.invoice_date, confidence: 0.95 }); // YYYY-MM-DD matches default parser
-              if (geminiData.total_amount) geminiEntities.push({ type: 'total_amount', value: String(geminiData.total_amount), confidence: 0.95 });
-              if (geminiData.net_amount) geminiEntities.push({ type: 'net_amount', value: String(geminiData.net_amount), confidence: 0.95 });
-              if (geminiData.tax_amount) geminiEntities.push({ type: 'tax_amount', value: String(geminiData.tax_amount), confidence: 0.95 });
-
-              // Overwrite/Append extracted data
-              return res.json({
-                success: true,
-                data: {
-                  fullText: fullText,
-                  entities: geminiEntities, // Frontend will love this
-                  detectedLanguages: detectedLanguages,
-                  source: 'gemini_flash'
-                }
+            if (extractedData.supplier_name) {
+              entities.push({
+                type: 'supplier_name',
+                value: extractedData.supplier_name,
+                confidence: 0.98
               });
             }
-          } catch (geminiError) {
-            console.error('❌ Gemini Extraction Failed:', geminiError);
+
+            if (extractedData.invoice_number) {
+              entities.push({
+                type: 'invoice_id',
+                value: extractedData.invoice_number,
+                confidence: 0.98
+              });
+            }
+
+            if (extractedData.invoice_date) {
+              entities.push({
+                type: 'invoice_date',
+                value: extractedData.invoice_date,
+                confidence: 0.98
+              });
+            }
+
+            if (extractedData.total_amount) {
+              entities.push({
+                type: 'total_amount',
+                value: String(extractedData.total_amount),
+                confidence: 0.98
+              });
+            }
+
+            if (extractedData.net_amount) {
+              entities.push({
+                type: 'net_amount',
+                value: String(extractedData.net_amount),
+                confidence: 0.98
+              });
+            }
+
+            if (extractedData.tax_amount) {
+              entities.push({
+                type: 'tax_amount',
+                value: String(extractedData.tax_amount),
+                confidence: 0.98
+              });
+            }
+
+            if (extractedData.currency) {
+              entities.push({
+                type: 'currency',
+                value: extractedData.currency,
+                confidence: 0.98
+              });
+            }
+
+            if (extractedData.trn) {
+              entities.push({
+                type: 'tax_registration_number',
+                value: extractedData.trn,
+                confidence: 0.98
+              });
+            }
+
+            // Return the extracted data
+            return res.json({
+              success: true,
+              data: {
+                fullText: fullText,
+                entities: entities,
+                detectedLanguages: detectedLanguages,
+                source: 'uae_rule_based',
+                extractedData: extractedData // Include full extracted data for debugging
+              }
+            });
+
+          } catch (extractionError) {
+            console.error('❌ UAE Extractor Failed:', extractionError);
             return res.status(500).json({
               success: false,
-              message: 'Failed to extract invoice data with Gemini',
-              error: geminiError.message
+              message: 'Failed to extract invoice data with UAE rule-based extractor',
+              error: extractionError.message
             });
           }
           // ---------------------------------------------------------

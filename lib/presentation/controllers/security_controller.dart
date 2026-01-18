@@ -148,10 +148,10 @@ class SecurityController extends GetxController {
         autoLockEnabled: true,
         autoLockTime: effectiveTime,
       );
-      final timeoutMinutes = int.tryParse(effectiveTime.replaceAll('m', '')) ?? 3;
+      final timeoutSeconds = (int.tryParse(effectiveTime.replaceAll('m', '')) ?? 3) * 60;
       AutoLockService.instance.updateSettings(
         enabled: true,
-        timeoutMinutes: timeoutMinutes,
+        timeoutSeconds: timeoutSeconds,
       );
       SnackbarService.to.showInfo(
         'Auto-lock Enabled',
@@ -172,8 +172,8 @@ class SecurityController extends GetxController {
     );
     
     // Apply auto-lock setting
-    final timeoutMinutes = int.tryParse(time.replaceAll('m', '')) ?? 3;
-    AutoLockService.instance.updateSettings(timeoutMinutes: timeoutMinutes);
+    final timeoutSeconds = (int.tryParse(time.replaceAll('m', '')) ?? 3) * 60;
+    AutoLockService.instance.updateSettings(timeoutSeconds: timeoutSeconds);
     
     SnackbarService.to.showInfo(
       'Auto-lock Updated',

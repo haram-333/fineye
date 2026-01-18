@@ -14,7 +14,7 @@ class AutoLockService {
   Timer? _inactivityTimer;
   DateTime _lastInteraction = DateTime.now();
   bool _isEnabled = true;
-  int _lockTimeoutSeconds = 15; // Set to 15s for testing as requested
+  int _lockTimeoutSeconds = 300; // Set to 5 minutes (300s) as requested
   bool _isLoggedOut = false;
   final SettingsStorageService _storageService = SettingsStorageService();
   
@@ -28,9 +28,8 @@ class AutoLockService {
     final settings = await _storageService.loadSecuritySettings();
     _isEnabled = settings['autoLockEnabled'] as bool? ?? true;
     
-    // For testing, we are hardcoding 15s. 
-    // In production, this would be parsed from settings.
-    _lockTimeoutSeconds = 15; 
+    // For production/testing, setting to 5 minutes
+    _lockTimeoutSeconds = 300; 
   }
   
   /// Update auto-lock settings
@@ -62,7 +61,7 @@ class AutoLockService {
       _checkInactivity();
     });
     
-    debugPrint('🔒 Session monitoring started (${_lockTimeoutSeconds}s timeout)');
+    debugPrint('🔒 Session monitoring started (${_lockTimeoutSeconds / 60}m timeout)');
   }
   
   /// Stop monitoring
@@ -119,7 +118,7 @@ class AutoLockService {
             ],
           ),
           content: const Text(
-            'Your session has expired due to 15 seconds of inactivity. You have been logged out to protect your financial data.',
+            'Your session has expired due to 5 minutes of inactivity. You have been logged out to protect your financial data.',
             style: TextStyle(fontSize: 16),
           ),
           actions: [

@@ -785,6 +785,18 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
 
             console.log(`✅ Extraction complete via ${extractionSource}!`);
 
+            // 3. Post-Extraction Validation (Sanity Checks)
+            if (extractedData.total_amount && extractedData.net_amount && extractedData.tax_amount) {
+              const expectedTotal = extractedData.net_amount + extractedData.tax_amount;
+              const diff = Math.abs(extractedData.total_amount - expectedTotal);
+              
+              // If the difference is huge (like the user reported 100k vs 870+43), it's a nonsense number
+              if (diff > (expectedTotal * 0.5) && extractedData.total_amount > 5000) {
+                console.warn(`⚠️ SMART VALIDATION: Total ${extractedData.total_amount} looks like nonsense (Expected: ~${expectedTotal}). Correcting to sum...`);
+                extractedData.total_amount = expectedTotal;
+              }
+            }
+
             // Map extracted data to entity format compatible with Flutter app
             const entities = [];
             

@@ -27,9 +27,9 @@ async function extractWithGemini(imageBuffer, mimeType) {
       
       JSON schema required:
       {
-        "supplier_name": string | null (translate Arabic names to English nicely),
+        "supplier_name": string | null (translate Arabic names to English smoothly),
         "trn": string | null (the 15-digit UAE TRN if applicable),
-        "invoice_number": string | null (look for Bill No, Inv No, etc.),
+        "invoice_number": string | null (look for Bill No, Inv No, Receipt No),
         "invoice_date": string | null (YYYY-MM-DD),
         "total_amount": number | null (the final grand total paid),
         "net_amount": number | null (amount before tax),
@@ -38,10 +38,12 @@ async function extractWithGemini(imageBuffer, mimeType) {
         "invoice_type": string | null
       }
 
-      RULES:
-      - Use your vision to identify labels correctly based on their position.
-      - Extract the FINAL total amount. Ignore phone numbers or other long digits.
-      - Return ONLY the JSON object.
+      STRICT RULES:
+      1. DO NOT include field labels in the values. For example, if you see "Bill No: 42800", the invoice_number is "42800", NOT "Bill No: 42800".
+      2. If you see "Bill No" or "Inv No", use the number next to it as the 'invoice_number', NOT the 'supplier_name'.
+      3. MATH CHECK: Ensure total_amount ≈ net_amount + tax_amount. If a total looks like a TRN or a random code (e.g. 100121.00 when net is 870), ignore it and look for a more reasonable total near the bottom.
+      4. Avoid picking up phone numbers or long numeric codes as the total.
+      5. Return ONLY the JSON object. No Markdown.
     `;
 
     console.log("🤖 Gemini Vision: Sending image to gemini-2.0-flash...");

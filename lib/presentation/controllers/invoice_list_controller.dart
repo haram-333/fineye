@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:fineye/core/constants/app_routes.dart';
 import 'package:fineye/core/services/snackbar_service.dart';
-import 'package:fineye/domain/services/compliance_status_service.dart';
 import 'package:fineye/data/repositories/user_invoice_repository.dart';
 import 'package:fineye/data/services/auth_service.dart';
 import 'package:fineye/data/models/invoice_model.dart';
 import 'dashboard_controller.dart';
+import '../../core/services/invoice_export_service.dart';
 
 const double vatTolerance = 0.05;
 
@@ -628,24 +628,78 @@ class InvoiceListController extends GetxController {
   }
 
   Future<void> exportInvoices() async {
-    // Show readiness checklist before allowing export
-    if (Get.isRegistered<DashboardController>()) {
-      Get.find<DashboardController>().showReadinessChecklist();
-    } else {
-      // Fallback: Check compliance directly if dashboard not available
-      final complianceService = Get.find<ComplianceStatusService>();
-      if (!complianceService.canProceedToFile()) {
-         SnackbarService.to.showError(
-          'Action Blocked',
-          'Cannot proceed with export. Please resolve all compliance issues first.',
-        );
-        return;
+    // Show a dialog to choose between VAT Summary (Compliance) and Quick Export (Current List)
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Export Options',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Get.back();
+                performQuickExport();
+              },
+              icon: const Icon(Icons.table_view, color: Colors.white),
+              label: const Text('Quick Export (Current List)', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF002060),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Get.back();
+                if (Get.isRegistered<DashboardController>()) {
+                  Get.find<DashboardController>().showReadinessChecklist();
+                } else {
+                  SnackbarService.to.showError('Error', 'Dashboard not available for compliance check.');
+                }
+              },
+              icon: const Icon(Icons.verified_user),
+              label: const Text('Full VAT Summary (Compliance Check)'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> performQuickExport() async {
+    if (filteredInvoices.isEmpty) {
+      SnackbarService.to.showInfo('Empty List', 'No invoices in the current view to export.');
+      return;
+    }
+
+    SnackbarService.to.showInfo('Exporting', 'Preparing your Excel file...');
+    
+    try {
+      final path = await InvoiceExportService.exportToExcel(filteredInvoices);
+      if (path != null) {
+        // Share is handled inside the service now
+        debugPrint('✅ Export handled via share sheet');
       }
-      
-      SnackbarService.to.showInfo(
-        'Export',
-        'Exporting invoices...',
-      );
+    } catch (e) {
+      debugPrint('❌ Export error: $e');
+      SnackbarService.to.showError('Export Failed', 'An error occurred during export.');
     }
   }
 

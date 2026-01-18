@@ -768,10 +768,11 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
             let extractedData = null;
             let extractionSource = 'gemini';
 
-            // 1. Try Gemini first (Best for variability)
+            // 1. Try Gemini first (Multimodal Vision - Best for accuracy)
             if (process.env.GEMINI_API_KEY) {
-              console.log('🤖 Gemini: Starting structured extraction...');
-              extractedData = await extractWithGemini(fullText);
+              console.log('🤖 Gemini Vision: Starting multimodal extraction...');
+              extractedData = await extractWithGemini(req.file.buffer, req.file.mimetype);
+              extractionSource = 'gemini_vision';
             }
 
             // 2. Fallback to UAE Rule-based extractor if Gemini fails or is missing

@@ -865,7 +865,7 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
           }
           // ---------------------------------------------------------
 
-          // Gemini is mandatory - no fallback to Document AI entities
+          // UAE Rule-based extractor is now mandatory - no fallback to LLM or Document AI entities
 });
 
 // Reset password endpoint (requires OTP verification first)

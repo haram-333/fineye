@@ -14,8 +14,7 @@ class InteractionTracker extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => AutoLockService.instance.recordInteraction(),
-      onPanStart: (_) => AutoLockService.instance.recordInteraction(),
-      onPanUpdate: (_) => AutoLockService.instance.recordInteraction(),
+
       onScaleStart: (_) => AutoLockService.instance.recordInteraction(),
       onScaleUpdate: (_) => AutoLockService.instance.recordInteraction(),
       behavior: HitTestBehavior.translucent,

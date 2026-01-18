@@ -772,77 +772,75 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
 
           // Gemini is required, so we always try it
           try {
-            try {
-              console.log('✨ Gemini: Starting intelligent extraction...');
-              const { GoogleGenerativeAI } = require("@google/generative-ai");
-              const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-              const model = genAI.getGenerativeModel({ 
-                model: "gemini-1.5-flash",
-                generationConfig: { responseMimeType: "application/json" }
-              });
+            console.log('✨ Gemini: Starting intelligent extraction...');
+            const { GoogleGenerativeAI } = require("@google/generative-ai");
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({
+              model: "gemini-1.5-flash",
+              generationConfig: { responseMimeType: "application/json" }
+            });
 
-              const prompt = `
-                You are an expert invoice data extractor. 
-                Extract the following fields from this invoice text and return ONLY a valid JSON object.
-                
-                Fields to extract:
-                - supplier_name (string): Name of the vendor/company/supplier. Be precise.
-                - invoice_date (string): Date of the invoice in YYYY-MM-DD format.
-                - invoice_number (string): The invoice identifier/number.
-                - total_amount (number): The generic total/grand total.
-                - net_amount (number): The amount before tax/VAT.
-                - tax_amount (number): The VAT/Tax amount.
-                - currency (string): The currency code (e.g., AED, USD).
-                
-                Rules:
-                - If a field is not found, set it to null.
-                - The text contains Arabic and English. Handle both.
-                - Return CAREFULLY parsed numbers (no commas).
-                
-                Invoice Text:
-                """
-                ${fullText}
-                """
-              `;
+            const prompt = `
+              You are an expert invoice data extractor.
+              Extract the following fields from this invoice text and return ONLY a valid JSON object.
 
-              const result = await model.generateContent(prompt);
-              const response = await result.response;
-              const text = response.text();
-              console.log('✨ Gemini: Extraction complete!');
-              console.log('✨ Gemini: Raw response:', text);
+              Fields to extract:
+              - supplier_name (string): Name of the vendor/company/supplier. Be precise.
+              - invoice_date (string): Date of the invoice in YYYY-MM-DD format.
+              - invoice_number (string): The invoice identifier/number.
+              - total_amount (number): The generic total/grand total.
+              - net_amount (number): The amount before tax/VAT.
+              - tax_amount (number): The VAT/Tax amount.
+              - currency (string): The currency code (e.g., AED, USD).
 
-              const geminiData = JSON.parse(text);
-              
-              // Merge Gemini data into our response structure
-              // We simulate "entities" so the frontend (OCRController) handles it seamlessly
-              if (geminiData) {
-                const geminiEntities = [];
-                if (geminiData.supplier_name) geminiEntities.push({ type: 'supplier_name', value: geminiData.supplier_name, confidence: 0.95 });
-                if (geminiData.invoice_number) geminiEntities.push({ type: 'invoice_id', value: geminiData.invoice_number, confidence: 0.95 });
-                if (geminiData.invoice_date) geminiEntities.push({ type: 'invoice_date', value: geminiData.invoice_date, confidence: 0.95 }); // YYYY-MM-DD matches default parser
-                if (geminiData.total_amount) geminiEntities.push({ type: 'total_amount', value: String(geminiData.total_amount), confidence: 0.95 });
-                if (geminiData.net_amount) geminiEntities.push({ type: 'net_amount', value: String(geminiData.net_amount), confidence: 0.95 });
-                if (geminiData.tax_amount) geminiEntities.push({ type: 'tax_amount', value: String(geminiData.tax_amount), confidence: 0.95 });
+              Rules:
+              - If a field is not found, set it to null.
+              - The text contains Arabic and English. Handle both.
+              - Return CAREFULLY parsed numbers (no commas).
 
-                // Overwrite/Append extracted data
-                return res.json({
-                  success: true,
-                  data: {
-                    fullText: fullText,
-                    entities: geminiEntities, // Frontend will love this
-                    detectedLanguages: detectedLanguages,
-                    source: 'gemini_flash'
-                  }
-                });
-              }
-            } catch (geminiError) {
-              console.error('❌ Gemini Extraction Failed:', geminiError);
-              return res.status(500).json({
-                success: false,
-                message: 'Failed to extract invoice data with Gemini',
-                error: geminiError.message
+              Invoice Text:
+              """
+              ${fullText}
+              """
+            `;
+
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+            console.log('✨ Gemini: Extraction complete!');
+            console.log('✨ Gemini: Raw response:', text);
+
+            const geminiData = JSON.parse(text);
+
+            // Merge Gemini data into our response structure
+            // We simulate "entities" so the frontend (OCRController) handles it seamlessly
+            if (geminiData) {
+              const geminiEntities = [];
+              if (geminiData.supplier_name) geminiEntities.push({ type: 'supplier_name', value: geminiData.supplier_name, confidence: 0.95 });
+              if (geminiData.invoice_number) geminiEntities.push({ type: 'invoice_id', value: geminiData.invoice_number, confidence: 0.95 });
+              if (geminiData.invoice_date) geminiEntities.push({ type: 'invoice_date', value: geminiData.invoice_date, confidence: 0.95 }); // YYYY-MM-DD matches default parser
+              if (geminiData.total_amount) geminiEntities.push({ type: 'total_amount', value: String(geminiData.total_amount), confidence: 0.95 });
+              if (geminiData.net_amount) geminiEntities.push({ type: 'net_amount', value: String(geminiData.net_amount), confidence: 0.95 });
+              if (geminiData.tax_amount) geminiEntities.push({ type: 'tax_amount', value: String(geminiData.tax_amount), confidence: 0.95 });
+
+              // Overwrite/Append extracted data
+              return res.json({
+                success: true,
+                data: {
+                  fullText: fullText,
+                  entities: geminiEntities, // Frontend will love this
+                  detectedLanguages: detectedLanguages,
+                  source: 'gemini_flash'
+                }
               });
             }
+          } catch (geminiError) {
+            console.error('❌ Gemini Extraction Failed:', geminiError);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to extract invoice data with Gemini',
+              error: geminiError.message
+            });
           }
           // ---------------------------------------------------------
 

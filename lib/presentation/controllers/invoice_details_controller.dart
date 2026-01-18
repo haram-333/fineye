@@ -134,14 +134,18 @@ class InvoiceDetailsController extends GetxController {
             vatActivity: 'Low',
           );
           
-          // SKIP structured data - Document AI returns garbage values
-          // ONLY parse raw OCR text which is accurate
-          if (args['rawOcrText'] != null) {
+          // USE structured data from Gemini/Document AI if available
+          // This is much more accurate than local regex
+          if (args['extractedData'] != null) {
+            print('✅ Invoice Details: Loading structured extracted data from backend...');
+            _loadExtractedData(args['extractedData']);
+          } else if (args['rawOcrText'] != null) {
+            // Fallback to raw text parsing ONLY if structured data is missing
             final rawText = args['rawOcrText'] as String;
-            print('✅ Invoice Details: Parsing raw OCR text (${rawText.length} chars)...');
+            print('⚠️ Invoice Details: No structured data, falling back to raw OCR text parsing...');
             _parseRawTextToFields(rawText);
           } else {
-            print('❌ Invoice Details: No raw OCR text available!');
+            print('❌ Invoice Details: No extraction data available!');
           }
         } else if (args['invoice'] != null && args['invoice'] is Invoice) {
           invoice = args['invoice'] as Invoice;
@@ -302,6 +306,71 @@ class InvoiceDetailsController extends GetxController {
     // DON'T sync from reactive values to controllers - this causes cursor resets
     // The controllers are the source of truth during editing
     // Only initialize them once in _loadInvoiceData
+  }
+
+  /// Load structured data from ExtractedInvoiceData
+  void _loadExtractedData(dynamic extractedData) {
+    if (extractedData == null) return;
+
+    try {
+      // Extract supplier name
+      if (extractedData.supplierName?.value != null) {
+        supplierController.text = extractedData.supplierName.value;
+        print('✅ Invoice Details: Loaded supplier: ${extractedData.supplierName.value}');
+      }
+
+      // Extract invoice number
+      if (extractedData.invoiceNumber?.value != null) {
+        invoiceNumberController.text = extractedData.invoiceNumber.value;
+        print('✅ Invoice Details: Loaded invoice number: ${extractedData.invoiceNumber.value}');
+      }
+
+      // Extract invoice date
+      if (extractedData.invoiceDate?.value != null) {
+        invoiceDate.value = extractedData.invoiceDate.value;
+        print('✅ Invoice Details: Loaded invoice date: ${extractedData.invoiceDate.value}');
+      }
+
+      // Extract amounts
+      if (extractedData.netAmount != null && extractedData.netAmount > 0) {
+        netAmount.value = extractedData.netAmount;
+        netAmountController.text = extractedData.netAmount.toStringAsFixed(2);
+        print('✅ Invoice Details: Loaded net amount: ${extractedData.netAmount}');
+      }
+
+      if (extractedData.vatAmount != null && extractedData.vatAmount > 0) {
+        vatAmount.value = extractedData.vatAmount;
+        print('✅ Invoice Details: Loaded VAT amount: ${extractedData.vatAmount}');
+      }
+
+      if (extractedData.grossAmount != null && extractedData.grossAmount > 0) {
+        grossAmount.value = extractedData.grossAmount;
+        print('✅ Invoice Details: Loaded gross amount: ${extractedData.grossAmount}');
+      }
+
+      // Calculate missing amounts if needed
+      if (netAmount.value > 0 && vatAmount.value == 0.0) {
+        vatAmount.value = netAmount.value * 0.05;
+        print('✅ Invoice Details: Calculated VAT (5%): ${vatAmount.value}');
+      }
+
+      if (netAmount.value > 0 && grossAmount.value == 0.0) {
+        grossAmount.value = netAmount.value + vatAmount.value;
+        print('✅ Invoice Details: Calculated gross amount: ${grossAmount.value}');
+      }
+
+      print('📊 Invoice Details: Final loaded values - Net: ${netAmount.value}, VAT: ${vatAmount.value}, Gross: ${grossAmount.value}');
+    } catch (e, stackTrace) {
+      print('❌❌❌ Invoice Details: ERROR LOADING EXTRACTED DATA ❌❌❌');
+      print('❌ Error Type: ${e.runtimeType}');
+      print('❌ Error Message: $e');
+      print('❌ Stack Trace:');
+      print(stackTrace);
+      debugPrint('❌❌❌ Invoice Details: ERROR LOADING EXTRACTED DATA ❌❌❌');
+      debugPrint('❌ Error Type: ${e.runtimeType}');
+      debugPrint('❌ Error Message: $e');
+      debugPrint('❌ Stack Trace: $stackTrace');
+    }
   }
   
   void _checkForChanges() {

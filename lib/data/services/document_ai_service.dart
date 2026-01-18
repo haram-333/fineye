@@ -10,22 +10,24 @@ class DocumentAIService {
   static const String productionUrl = 'https://fineye-one.vercel.app';
   
   // Your computer's local IP address (for physical device testing)
-  static const String localIp = '192.168.100.6';
+  static const String localIp = '192.168.1.5';
   
   // Get base URL based on environment and platform
   static String get baseUrl {
-    // Always use production URL - works for all platforms including web
+    // In debug mode, prioritize local backend for testing
+    if (kDebugMode) {
+      if (kIsWeb) {
+        return 'http://localhost:3000';
+      }
+      return 'http://$localIp:3000';
+    }
+
+    // Always use production URL in release mode
     if (productionUrl.isNotEmpty && productionUrl != 'YOUR_PRODUCTION_URL_HERE') {
       return productionUrl;
     }
     
-    // Development mode URLs (fallback if production URL not set)
-    if (kIsWeb) {
-      return 'http://localhost:3000';
-    }
-    
-    // For mobile platforms in development
-    return 'http://$localIp:3000';
+    return 'https://fineye-one.vercel.app'; // Fallback
   }
 
   /// Process invoice image with Document AI

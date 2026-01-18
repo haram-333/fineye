@@ -7,6 +7,7 @@ const admin = require('firebase-admin');
 const multer = require('multer');
 const { parseInvoiceWithDocumentAI } = require('./documentaiHelper');
 const { UAEInvoiceExtractor } = require('../services/uae-invoice-extractor');
+const { extractWithGemini } = require('./geminiHelper');
 
 dotenv.config();
 
@@ -751,10 +752,9 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
           }
 
           // ---------------------------------------------------------
-          // UAE RULE-BASED INVOICE EXTRACTION
+          // SMART INVOICE EXTRACTION (Gemini + UAE Rules)
           // ---------------------------------------------------------
-          // Using comprehensive rule-based extraction for UAE invoice formats
-          // This provides highly accurate, predictable extraction for all UAE invoice types
+          // Use Gemini for high-variability layouts, fallback to UAE rules
 
           if (fullText.length <= 10) {
             console.error('❌ Not enough OCR text for extraction');
@@ -765,107 +765,74 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
           }
 
           try {
-            console.log('🔍 UAE Extractor: Starting rule-based extraction...');
+            let extractedData = null;
+            let extractionSource = 'gemini';
 
-            // Initialize the UAE invoice extractor
-            const extractor = new UAEInvoiceExtractor();
+            // 1. Try Gemini first (Best for variability)
+            if (process.env.GEMINI_API_KEY) {
+              console.log('🤖 Gemini: Starting structured extraction...');
+              extractedData = await extractWithGemini(fullText);
+            }
 
-            // Extract invoice data using comprehensive rules
-            const extractedData = extractor.extract(fullText);
+            // 2. Fallback to UAE Rule-based extractor if Gemini fails or is missing
+            if (!extractedData) {
+              console.log('🔍 UAE Extractor: Falling back to rule-based extraction...');
+              const extractor = new UAEInvoiceExtractor();
+              extractedData = extractor.extract(fullText);
+              extractionSource = 'uae_rule_based';
+            }
 
-            console.log('✅ UAE Extractor: Extraction complete!');
-            console.log('📊 Extracted fields:', Object.keys(extractedData).filter(k => extractedData[k] !== null).length);
+            console.log(`✅ Extraction complete via ${extractionSource}!`);
 
-            // Convert to entity format compatible with frontend
+            // Map extracted data to entity format compatible with Flutter app
             const entities = [];
-
+            
+            // Critical: Ensure keys match what OCRController expects
             if (extractedData.supplier_name) {
-              entities.push({
-                type: 'supplier_name',
-                value: extractedData.supplier_name,
-                confidence: 0.98
-              });
+              entities.push({ type: 'supplier_name', value: extractedData.supplier_name, confidence: 0.95 });
             }
-
             if (extractedData.invoice_number) {
-              entities.push({
-                type: 'invoice_id',
-                value: extractedData.invoice_number,
-                confidence: 0.98
-              });
+              entities.push({ type: 'invoice_id', value: extractedData.invoice_number, confidence: 0.95 });
             }
-
             if (extractedData.invoice_date) {
-              entities.push({
-                type: 'invoice_date',
-                value: extractedData.invoice_date,
-                confidence: 0.98
-              });
+              entities.push({ type: 'invoice_date', value: extractedData.invoice_date, confidence: 0.95 });
             }
-
             if (extractedData.total_amount) {
-              entities.push({
-                type: 'total_amount',
-                value: String(extractedData.total_amount),
-                confidence: 0.98
-              });
+              entities.push({ type: 'total_amount', value: String(extractedData.total_amount), confidence: 0.95 });
             }
-
             if (extractedData.net_amount) {
-              entities.push({
-                type: 'net_amount',
-                value: String(extractedData.net_amount),
-                confidence: 0.98
-              });
+              entities.push({ type: 'net_amount', value: String(extractedData.net_amount), confidence: 0.95 });
             }
-
             if (extractedData.tax_amount) {
-              entities.push({
-                type: 'tax_amount',
-                value: String(extractedData.tax_amount),
-                confidence: 0.98
-              });
+              entities.push({ type: 'tax_amount', value: String(extractedData.tax_amount), confidence: 0.95 });
             }
-
             if (extractedData.currency) {
-              entities.push({
-                type: 'currency',
-                value: extractedData.currency,
-                confidence: 0.98
-              });
+              entities.push({ type: 'currency', value: extractedData.currency, confidence: 0.95 });
             }
-
             if (extractedData.trn) {
-              entities.push({
-                type: 'tax_registration_number',
-                value: extractedData.trn,
-                confidence: 0.98
-              });
+              entities.push({ type: 'tax_registration_number', value: extractedData.trn, confidence: 0.95 });
             }
 
-            // Return the extracted data
             return res.json({
               success: true,
               data: {
                 fullText: fullText,
                 entities: entities,
                 detectedLanguages: detectedLanguages,
-                source: 'uae_rule_based',
-                extractedData: extractedData // Include full extracted data for debugging
+                source: extractionSource,
+                extractedData: extractedData 
               }
             });
 
           } catch (extractionError) {
-            console.error('❌ UAE Extractor Failed:', extractionError);
+            console.error('❌ Extraction Failed:', extractionError);
             return res.status(500).json({
               success: false,
-              message: 'Failed to extract invoice data with UAE rule-based extractor',
+              message: 'Failed to extract invoice data',
               error: extractionError.message
             });
           }
           // ---------------------------------------------------------
-
-          // UAE Rule-based extractor is now mandatory - no fallback to LLM or Document AI entities
 });
 
 // Reset password endpoint (requires OTP verification first)

@@ -68,6 +68,9 @@ class OCRPreviewController extends GetxController {
   // Flag to track if we trusted AI data
   bool isExtractedDataLoaded = false;
 
+  // Store extracted data for passing to invoice details
+  dynamic storedExtractedData;
+
   // Categories
   final List<String> categories = [
     'Office supplies',
@@ -121,6 +124,7 @@ class OCRPreviewController extends GetxController {
         // Check if structured extracted data is provided
         if (args['extractedData'] != null) {
           print('✅ OCR Preview: Loading structured extracted data');
+          storedExtractedData = args['extractedData'];
           _loadExtractedData(args['extractedData']);
           isExtractedDataLoaded = true;
         }
@@ -859,13 +863,19 @@ class OCRPreviewController extends GetxController {
       );
 
       // 5) Navigate directly to full Invoice Details screen for this invoice.
-      // We pass both the Invoice object (for UI) and the Firestore docId so
-      // InvoiceDetailsController can persist updates back to the same document.
+      // We pass both the Invoice object, Firestore docId, AND the extracted data
+      // so InvoiceDetailsController can auto-populate form fields
       Get.offNamed(
         AppRoutes.invoiceDetails,
         arguments: {
           'invoice': invoiceToSave,
           'invoiceDocId': docId,
+          // Pass extracted data for auto-population
+          'extractedData': storedExtractedData,
+          'rawOcrText': rawOcrText.value, // Pass raw text for fallback parsing
+          // Also pass file info for image upload
+          'file': invoiceImageFile,
+          'imageBytes': null, // Web support
         },
       );
     } catch (e, stackTrace) {

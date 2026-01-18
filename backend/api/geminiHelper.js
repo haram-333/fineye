@@ -23,29 +23,40 @@ async function extractWithGemini(fullText) {
     });
 
     const prompt = `
-      You are an expert UAE Invoice Parser. 
-      Analyze the following raw OCR text from an invoice and extract the key information.
+      You are a world-class UAE Invoice Parser. 
+      Your goal is to extract structured data from raw OCR text with 100% accuracy.
+      
+      CRITICAL INSTRUCTIONS:
+      1. INVOICE NUMBER: Look for "Bill No", "Invoice #", "Receipt No", "INV-", or "فاتورة رقم". 
+         - DO NOT confuse "Bill No" with a phone number or TRN.
+      2. AMOUNTS (Nonsense Check): 
+         - The "total_amount" is the FINAL amount the customer paid. It is usually the largest number but NOT a TRN (15 digits usually starting with 3) or a Date.
+         - Search for labels: "Grand Total", "Total (Incl. VAT)", "Amount Due", "Net Payable", or "Cash".
+         - If you see multiple totals, pick the one labeled "Grand Total" or at the very bottom.
+      3. DATE: Find the invoice date. Look for "Date", "تاريخ", or common UAE formats like DD/MM/YYYY or DD-MMM-YYYY.
+      4. TRN (Tax Registration Number): This is a 15-digit number usually starting with '100' or '3'. It is NOT the invoice number.
+      5. CURRENCY: Default to "AED" unless SAR or USD is clearly stated.
       
       JSON schema required:
       {
-        "supplier_name": string | null,
-        "trn": string | null (15-digit UAE TRN),
+        "supplier_name": string | null (translate Arabic names to English nicely),
+        "trn": string | null (the 15-digit UAE TRN),
         "invoice_number": string | null,
         "invoice_date": string | null (YYYY-MM-DD),
-        "total_amount": number | null,
+        "total_amount": number | null (e.g., 123.45, no commas),
         "net_amount": number | null,
         "tax_amount": number | null,
-        "currency": string | null (usually AED),
+        "currency": string | null,
         "invoice_type": string | null
       }
 
       RULES:
-      1. Return JSON ONLY.
-      2. If values are missing, use null.
-      3. Remove commas from amounts.
-      4. If Arabic text is present, translate the supplier name nicely.
+      - Return ONLY the JSON object.
+      - If a field is missing, use null.
+      - Remove all commas from numeric fields.
+      - Ensure amounts are parsed as numbers, not strings.
 
-      INVOICE TEXT:
+      INVOICE TEXT TO ANALYZE:
       ${fullText}
     `;
 
@@ -53,9 +64,11 @@ async function extractWithGemini(fullText) {
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     
+    console.log("📝 Gemini Raw Response:", text); // Essential for debugging "nonsense" or "missing" fields
+    
     try {
       const jsonData = JSON.parse(text);
-      console.log("✅ Gemini: Successfully extracted structured data using 2.0 Flash");
+      console.log("✅ Gemini: Successfully extracted structured data:", JSON.stringify(jsonData, null, 2));
       return jsonData;
     } catch (parseError) {
       // Fallback for older library versions or unexpected formatting

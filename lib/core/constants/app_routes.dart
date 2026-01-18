@@ -17,6 +17,7 @@ class AppRoutes {
   static const String resetPassword = '/reset-password';
   static const String invoiceList = '/invoices';
   static const String invoiceDetails = '/invoice-details';
+  static const String invoiceEdit = '/invoice-edit';
   static const String invoiceFilters = '/invoice-filters';
   static const String imagePreprocessing = '/image-preprocessing';
   static const String ocrPreview = '/ocr-preview';

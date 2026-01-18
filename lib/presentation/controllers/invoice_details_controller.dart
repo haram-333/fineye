@@ -10,6 +10,7 @@ import '../../../data/models/invoice_model.dart';
 import '../../../data/repositories/user_invoice_repository.dart';
 import '../../../data/services/section_based_invoice_extractor.dart';
 import 'invoice_list_controller.dart';
+import 'dashboard_controller.dart';
 import '../../../core/services/snackbar_service.dart';
 import '../../../core/services/notification_helper.dart';
 
@@ -205,6 +206,8 @@ class InvoiceDetailsController extends GetxController {
     // Only load if we have an existing invoice with real data
     if (!isNewInvoice) {
       _loadInvoiceData();
+      // For existing invoices, reset hasChanges to false after loading
+      hasChanges.value = false;
     } else {
       // For new invoices, initialize payment status based on date
       // If date is in the future, set to Not Paid
@@ -215,12 +218,15 @@ class InvoiceDetailsController extends GetxController {
         // Default to Not Paid for new invoices
         isPaid.value = false;
       }
+      // New invoices always have changes (they need to be saved)
+      hasChanges.value = true;
     }
 
     // Setup controller sync with reactive values
     _setupControllerSync();
 
-  // Reactivity
+  // Reactivity - ONLY for non-text-field values
+    // DO NOT add listeners that might interfere with text field editing
     ever(invoiceDate, (_) {
       _runRiskAssessment();
       _checkForChanges();
@@ -229,26 +235,64 @@ class InvoiceDetailsController extends GetxController {
       _runRiskAssessment();
       _checkForChanges();
     });
-    ever(netAmount, (_) {
-      calculateVAT(fromGross: false);
-      _runRiskAssessment();
-      _checkForChanges();
-    });
-    // When additional charges change, DON'T recalculate VAT (VAT is only based on net)
-    // Just rerun risk assessment
-    ever(additionalCharges, (_) {
-      _runRiskAssessment();
-      _checkForChanges();
-    });
-    ever(vatAmount, (_) => _checkForChanges());
-    ever(grossAmount, (_) => _checkForChanges());
     ever(isCtDeductible, (_) => _checkForChanges());
+    ever(isPaid, (_) => _checkForChanges());
+    ever(dueDate, (_) => _checkForChanges());
+    
+    // Text field controllers - these are the source of truth
     supplierController.addListener(() {
       _runRiskAssessment();
       _checkForChanges();
     });
     invoiceNumberController.addListener(_checkForChanges);
     notesController.addListener(_checkForChanges);
+    
+    // Amount controllers - update reactive values ONLY, never touch controller text
+    netAmountController.addListener(() {
+      final text = netAmountController.text;
+      final cleaned = text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
+      if (cleaned.isEmpty || cleaned == '.') {
+        if (netAmount.value != 0.0) {
+          netAmount.value = 0.0;
+          vatAmount.value = 0.0;
+          grossAmount.value = 0.0;
+        }
+        return;
+      }
+      final d = double.tryParse(cleaned);
+      if (d != null && d >= 0) {
+        // Only update reactive value if it's different (prevents infinite loops)
+        if ((netAmount.value - d).abs() > 0.01) {
+          netAmount.value = d;
+          // Calculate VAT from net amount
+          final calculatedVat = d * 0.05;
+          vatAmount.value = (calculatedVat * 100).roundToDouble() / 100;
+          grossAmount.value = d + vatAmount.value;
+          _runRiskAssessment();
+          _checkForChanges();
+        }
+      }
+    });
+    
+    additionalChargesController.addListener(() {
+      final text = additionalChargesController.text;
+      final cleaned = text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
+      if (cleaned.isEmpty || cleaned == '.') {
+        if (additionalCharges.value != 0.0) {
+          additionalCharges.value = 0.0;
+        }
+        return;
+      }
+      final d = double.tryParse(cleaned);
+      if (d != null && d >= 0) {
+        // Only update reactive value if it's different (prevents infinite loops)
+        if ((additionalCharges.value - d).abs() > 0.01) {
+          additionalCharges.value = d;
+          _runRiskAssessment();
+          _checkForChanges();
+        }
+      }
+    });
   }
 
   void _setupControllerSync() {
@@ -263,26 +307,41 @@ class InvoiceDetailsController extends GetxController {
       return;
     }
     
-    // Compare current values with original invoice
+    // Calculate net amount from invoice for comparison
+    final invoiceNetAmount = invoice.grossAmount - invoice.vatAmount - invoice.additionalCharges;
+    
+    // Compare current values with original invoice - include ALL fields
     hasChanges.value = 
-      supplierController.text != invoice.supplierName ||
-      invoiceNumberController.text != invoice.id ||
-      (invoiceDate.value != null && invoiceDate.value != invoice.date) ||
+      supplierController.text.trim() != invoice.supplierName.trim() ||
+      invoiceNumberController.text.trim() != invoice.id.trim() ||
+      (invoiceDate.value != null && !invoiceDate.value!.isAtSameMomentAs(invoice.date)) ||
+      (invoiceDate.value == null && invoice.date != DateTime.now()) ||
       selectedCategory.value != invoice.category ||
-      netAmount.value != (invoice.grossAmount - invoice.vatAmount) ||
-      vatAmount.value != invoice.vatAmount ||
-      grossAmount.value != invoice.grossAmount ||
-      additionalCharges.value != invoice.additionalCharges ||
+      (netAmount.value - invoiceNetAmount).abs() > 0.01 || // Allow small floating point differences
+      (vatAmount.value - invoice.vatAmount).abs() > 0.01 ||
+      (grossAmount.value - invoice.grossAmount).abs() > 0.01 ||
+      (additionalCharges.value - invoice.additionalCharges).abs() > 0.01 ||
       isCtDeductible.value != invoice.isCtDeductible ||
-      notesController.text != invoice.notes;
+      notesController.text.trim() != invoice.notes.trim() ||
+      isPaid.value != (invoice.status == 'Paid') ||
+      (dueDate.value != null && invoice.dueDate != null && !dueDate.value!.isAtSameMomentAs(invoice.dueDate!)) ||
+      (dueDate.value == null && invoice.dueDate != null) ||
+      (dueDate.value != null && invoice.dueDate == null);
+    
+    debugPrint('🔍 Change detection: hasChanges=${hasChanges.value}');
+    debugPrint('  Supplier: "${supplierController.text.trim()}" vs "${invoice.supplierName.trim()}"');
+    debugPrint('  Invoice #: "${invoiceNumberController.text.trim()}" vs "${invoice.id.trim()}"');
+    debugPrint('  Category: "${selectedCategory.value}" vs "${invoice.category}"');
+    debugPrint('  Net: ${netAmount.value} vs ${invoiceNetAmount}');
+    debugPrint('  VAT: ${vatAmount.value} vs ${invoice.vatAmount}');
+    debugPrint('  Gross: ${grossAmount.value} vs ${invoice.grossAmount}');
+    debugPrint('  Additional: ${additionalCharges.value} vs ${invoice.additionalCharges}');
+    debugPrint('  CT Deductible: ${isCtDeductible.value} vs ${invoice.isCtDeductible}');
+    debugPrint('  Notes: "${notesController.text.trim()}" vs "${invoice.notes.trim()}"');
+    debugPrint('  Paid: ${isPaid.value} vs ${invoice.status == 'Paid'}');
+    debugPrint('  Due Date: ${dueDate.value} vs ${invoice.dueDate}');
   }
 
-  /// DISABLED - Document AI structured data is unreliable
-  /// We only use raw text parsing now
-  void _loadExtractedDataToInvoice(dynamic extractedData) {
-    // Do nothing - structured data from Document AI is garbage
-    print('⚠️ Skipping structured data - using raw text parsing only');
-  }
   
   /// Parse raw OCR text using section-based extraction
   /// Divides invoice into sections and extracts data from each
@@ -684,6 +743,7 @@ class InvoiceDetailsController extends GetxController {
     // Additional charges are NOT part of VAT calculation
     // Gross = Net + VAT (NOT including additional charges)
     
+    // CRITICAL: NEVER update controller text here - only update reactive values
     if (netAmount.value > 0) {
       // Calculate VAT from net (5%)
       final calculatedVat = netAmount.value * 0.05;
@@ -696,8 +756,16 @@ class InvoiceDetailsController extends GetxController {
       print('💰 VAT Calculation: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}, Additional=${additionalCharges.value}');
     } else if (grossAmount.value > 0 && fromGross) {
       // Calculate from gross (reverse: gross = net + vat, so net = gross / 1.05)
-      netAmount.value = grossAmount.value / 1.05;
-      vatAmount.value = grossAmount.value - netAmount.value;
+      // BUT: Don't update netAmount.value if user is currently editing it!
+      // Only update if netAmount is 0 (meaning user hasn't entered anything)
+      if (netAmount.value == 0.0) {
+        netAmount.value = grossAmount.value / 1.05;
+        vatAmount.value = grossAmount.value - netAmount.value;
+        // Update controller text ONLY if it's empty
+        if (netAmountController.text.isEmpty || netAmountController.text == '0.00' || netAmountController.text == '0') {
+          netAmountController.text = netAmount.value.toStringAsFixed(2);
+        }
+      }
       
       print('💰 VAT Calculation (from gross): Gross=${grossAmount.value}, Net=${netAmount.value}, VAT=${vatAmount.value}');
     } else {
@@ -753,35 +821,13 @@ class InvoiceDetailsController extends GetxController {
   }
 
   void updateNetAmount(String val) {
-    // Remove AED prefix, commas, spaces and parse
-    final cleaned = val.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
-    if (cleaned.isEmpty || cleaned == '.') {
-      netAmount.value = 0.0;
-      return;
-    }
-    final d = double.tryParse(cleaned);
-    if (d != null && d >= 0) {
-      netAmount.value = d;
-    }
-    // Don't update controller text here - let user continue typing
+    // DO NOTHING - let the controller listener handle it
+    // This prevents any interference with user typing
   }
 
   void updateAdditionalCharges(String val) {
-    print('💰 updateAdditionalCharges called: "$val"');
-    // Remove AED prefix, commas, spaces and parse
-    final cleaned = val.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
-    print('💰 Cleaned value: "$cleaned"');
-    if (cleaned.isEmpty || cleaned == '.') {
-      additionalCharges.value = 0.0;
-      print('💰 Set additionalCharges to 0.0 (empty)');
-      return;
-    }
-    final d = double.tryParse(cleaned);
-    if (d != null && d >= 0) {
-      additionalCharges.value = d;
-      print('💰 Set additionalCharges to $d');
-    }
-    // Don't update controller text here - let user continue typing
+    // DO NOTHING - let the controller listener handle it
+    // This prevents any interference with user typing
   }
 
   Future<void> selectDate() async {
@@ -827,6 +873,15 @@ class InvoiceDetailsController extends GetxController {
       SnackbarService.to.showError(
         'Validation Error',
         'Gross amount must be greater than 0',
+      );
+      return;
+    }
+
+    // Validate due date if unpaid
+    if (!isPaid.value && dueDate.value == null) {
+      SnackbarService.to.showError(
+        'Validation Error',
+        'Due date is required when invoice is not paid',
       );
       return;
     }
@@ -904,6 +959,18 @@ class InvoiceDetailsController extends GetxController {
         }
       }
 
+      // Read values from controllers (source of truth) to ensure we get latest user input
+      final netText = netAmountController.text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
+      final netFromController = double.tryParse(netText) ?? netAmount.value;
+      
+      final additionalText = additionalChargesController.text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
+      final additionalFromController = double.tryParse(additionalText) ?? additionalCharges.value;
+      
+      // Calculate VAT from net amount
+      final calculatedVat = netFromController * 0.05;
+      final vatFromNet = (calculatedVat * 100).roundToDouble() / 100;
+      final grossFromNet = netFromController + vatFromNet;
+      
       // Create updated invoice from form data with recalculated risks.
       // Note: we preserve immutable metadata like userId and imageUrl from the
       // existing `invoice` instance so that edits only touch what the user sees.
@@ -912,9 +979,9 @@ class InvoiceDetailsController extends GetxController {
         supplierName: supplierController.text,
         category: selectedCategory.value.isNotEmpty ? selectedCategory.value : invoice.category,
         date: invoiceDate.value ?? DateTime.now(),
-        grossAmount: grossAmount.value,
-        vatAmount: vatAmount.value,
-        additionalCharges: additionalCharges.value,
+        grossAmount: grossFromNet,
+        vatAmount: vatFromNet,
+        additionalCharges: additionalFromController,
         status: _determineInvoiceStatus(),
         taxBadge: invoice.taxBadge,
         notes: notesController.text,
@@ -946,13 +1013,25 @@ class InvoiceDetailsController extends GetxController {
         if (success) {
           print('✅✅✅ Invoice Details: Update SUCCESSFUL ✅✅✅');
           SnackbarService.to.showSuccess(
-            'Updated',
-            'Invoice updated successfully',
+            'title_updated'.tr,
+            'msg_invoice_updated_success'.tr,
           );
+          
+          // Trigger refresh of invoice list and dashboard
+          if (Get.isRegistered<InvoiceListController>()) {
+            final invoiceController = Get.find<InvoiceListController>();
+            await invoiceController.refreshInvoices();
+          }
+          
+          if (Get.isRegistered<DashboardController>()) {
+            final dashboardController = Get.find<DashboardController>();
+            dashboardController.loadDashboardData();
+          }
+          
           // Reset hasChanges flag
           hasChanges.value = false;
-          // Close the screen after a short delay
-          await Future.delayed(const Duration(milliseconds: 500));
+          // Close the screen after a short delay to allow stream to update
+          await Future.delayed(const Duration(milliseconds: 800));
           Get.back();
         } else {
           print('❌ Invoice Details: Update returned false');
@@ -1108,13 +1187,24 @@ class InvoiceDetailsController extends GetxController {
 
       SnackbarService.to.showSuccess(
         'invoice_saved'.tr,
-        'Invoice saved successfully',
+        'msg_invoice_saved_success'.tr,
       );
       
-      print('🎉 Invoice Details: Save complete, navigating back');
+      print('🎉 Invoice Details: Save complete');
       
-      // Navigate back to main screen
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Trigger refresh of invoice list and dashboard
+      if (Get.isRegistered<InvoiceListController>()) {
+        final invoiceController = Get.find<InvoiceListController>();
+        await invoiceController.refreshInvoices();
+      }
+      
+      if (Get.isRegistered<DashboardController>()) {
+        final dashboardController = Get.find<DashboardController>();
+        dashboardController.loadDashboardData();
+      }
+      
+      // Navigate back to main screen after a short delay to allow stream to update
+      await Future.delayed(const Duration(milliseconds: 800));
       Get.offAllNamed('/main');
     } catch (e, stackTrace) {
       print('❌❌❌ Invoice Details: ERROR SAVING NEW INVOICE ❌❌❌');

@@ -4,9 +4,11 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'invoice_details_view.dart';
 import 'package:fineye/presentation/controllers/invoice_list_controller.dart';
+import 'package:fineye/presentation/controllers/invoice_filters_controller.dart';
 import 'package:fineye/presentation/controllers/main_controller.dart';
 import 'package:fineye/data/models/invoice_model.dart';
 import 'package:fineye/core/constants/app_colors.dart';
+import 'package:fineye/core/constants/app_routes.dart';
 import 'package:fineye/core/services/snackbar_service.dart';
 
 class InvoiceListView extends GetView<InvoiceListController> {
@@ -23,13 +25,13 @@ class InvoiceListView extends GetView<InvoiceListController> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: RefreshIndicator(
-          onRefresh: () async {
-            print('🔄 Pull to refresh triggered');
-            controller.loadInvoices();
-            // Wait a bit for the stream to update
-            await Future.delayed(const Duration(milliseconds: 500));
-          },
+          child: RefreshIndicator(
+            onRefresh: () async {
+              debugPrint('🔄 Pull to refresh triggered');
+              await controller.refreshInvoices();
+              // Wait a bit for the stream to update
+              await Future.delayed(const Duration(milliseconds: 500));
+            },
           color: AppColors.primaryBlue,
           child: CustomScrollView(
             slivers: [
@@ -384,6 +386,18 @@ class InvoiceListView extends GetView<InvoiceListController> {
 
   Widget _buildInvoiceList(BuildContext context) {
     return Obx(() {
+      // Check if filters are active
+      final hasActiveFilters = controller.filterStartDate.value != null ||
+          controller.filterEndDate.value != null ||
+          (controller.filterSupplier.value.isNotEmpty && controller.filterSupplier.value != 'All suppliers') ||
+          (controller.filterCategory.value.isNotEmpty && controller.filterCategory.value != 'All categories') ||
+          controller.filterStatuses.isNotEmpty ||
+          controller.filterTaxType.value != 'All tax types' ||
+          controller.filterMinAmount.value > 0 ||
+          controller.filterMaxAmount.value > 0 ||
+          controller.searchQuery.value.isNotEmpty ||
+          controller.riskFilter.value != 'all';
+      
       // Show empty state if no invoices
       if (controller.filteredInvoices.isEmpty && !controller.isLoading.value) {
         return SliverFillRemaining(
@@ -394,14 +408,14 @@ class InvoiceListView extends GetView<InvoiceListController> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.receipt_long_outlined,
+                  hasActiveFilters ? Icons.filter_alt_outlined : Icons.receipt_long_outlined,
                   size: 80,
                   color: Colors.grey.shade400,
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'No Invoices Yet',
-                  style: TextStyle(
+                Text(
+                  hasActiveFilters ? 'No Invoices Match Your Filters' : 'No Invoices Yet',
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: AppColors.ink,
@@ -410,7 +424,9 @@ class InvoiceListView extends GetView<InvoiceListController> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Start by uploading your first invoice to get started with VAT tracking and compliance.',
+                  hasActiveFilters
+                      ? 'Try adjusting your filters or search query to see more results.'
+                      : 'Start by uploading your first invoice to get started with VAT tracking and compliance.',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -418,31 +434,67 @@ class InvoiceListView extends GetView<InvoiceListController> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Switch to upload tab (index 2 in MainController)
-                    if (Get.isRegistered<MainController>()) {
-                      final mainController = Get.find<MainController>();
-                      mainController.changeTabIndex(2); // Upload tab
-                    }
-                  },
-                  icon: const Icon(Icons.camera_alt, color: Colors.white),
-                  label: const Text(
-                    'Upload Invoice',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                if (!hasActiveFilters) ...[
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Switch to upload tab (index 2 in MainController)
+                      if (Get.isRegistered<MainController>()) {
+                        final mainController = Get.find<MainController>();
+                        mainController.changeTabIndex(2); // Upload tab
+                      }
+                    },
+                    icon: const Icon(Icons.camera_alt, color: Colors.white),
+                    label: const Text(
+                      'Upload Invoice',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                ] else ...[
+                  const SizedBox(height: 24),
+                  TextButton.icon(
+                    onPressed: () {
+                  // Clear all filters - reset to default state
+                  controller.filterStartDate.value = null;
+                  controller.filterEndDate.value = null;
+                  controller.filterSupplier.value = '';
+                  controller.filterCategory.value = '';
+                  controller.filterStatuses.clear();
+                  controller.filterTaxType.value = 'All tax types';
+                  controller.filterMinAmount.value = 0.0;
+                  controller.filterMaxAmount.value = 0.0;
+                  controller.searchQuery.value = '';
+                  controller.searchController.clear();
+                  controller.riskFilter.value = 'all';
+                  
+                  // Also clear the InvoiceFiltersController if it exists
+                  if (Get.isRegistered<InvoiceFiltersController>()) {
+                    final filterController = Get.find<InvoiceFiltersController>();
+                    filterController.clearAll();
+                  }
+                  
+                  // Filters will be automatically reapplied via reactive listeners
+                    },
+                    icon: const Icon(Icons.clear_all, color: AppColors.primaryBlue),
+                    label: const Text(
+                      'Clear All Filters',
+                      style: TextStyle(
+                        color: AppColors.primaryBlue,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -535,12 +587,8 @@ class InvoiceListView extends GetView<InvoiceListController> {
       ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          // Swipe right to open - don't dismiss, just open
-          Navigator.of(context, rootNavigator: true).push(
-            MaterialPageRoute(
-              builder: (context) => InvoiceDetailsView(invoice: invoice),
-            ),
-          );
+          // Swipe right to open edit page
+          Get.toNamed(AppRoutes.invoiceEdit, arguments: invoice);
           return false; // Don't dismiss the item
         } else {
           // Swipe left to delete - show confirmation
@@ -586,11 +634,8 @@ class InvoiceListView extends GetView<InvoiceListController> {
   Widget _buildInvoiceCard(BuildContext context, Invoice invoice) {
     return GestureDetector(
       onTap: () {
-        Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute(
-            builder: (context) => InvoiceDetailsView(invoice: invoice),
-          ),
-        );
+        // Navigate to edit page
+        Get.toNamed(AppRoutes.invoiceEdit, arguments: invoice);
       },
       child: Container(
         padding: const EdgeInsets.all(16),

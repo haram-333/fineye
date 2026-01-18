@@ -321,6 +321,7 @@ class ExtractedInvoiceData {
   final double? vatAmount;
   final double? grossAmount;
   final double overallConfidence;
+  final Map<String, dynamic> rawEntities;
 
   ExtractedInvoiceData({
     required this.supplierName,
@@ -330,6 +331,7 @@ class ExtractedInvoiceData {
     this.vatAmount,
     this.grossAmount,
     required this.overallConfidence,
+    this.rawEntities = const {},
   });
 
   factory ExtractedInvoiceData.empty() {
@@ -338,6 +340,7 @@ class ExtractedInvoiceData {
       invoiceNumber: ExtractedField.empty(),
       invoiceDate: ExtractedField.empty(),
       overallConfidence: 0.0,
+      rawEntities: const {},
     );
   }
 

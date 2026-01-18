@@ -240,7 +240,7 @@ class CompanyProfileView extends GetView<CompanyProfileController> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Obx(() => Text(
-        'Profile ${(controller.completeness.value * 100).toInt()}% complete', // Hardcoded EN as per image for now usually, or key
+        'profile_completeness'.trParams({'percent': (controller.completeness.value * 100).toInt().toString()}),
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -366,13 +366,12 @@ class CompanyProfileView extends GetView<CompanyProfileController> {
            ),
            const SizedBox(height: 16),
            
-           Row(
-             children: [
-               Expanded(child: _buildDatePicker('${'financial_year_start_label'.tr} *', controller.financialYearStart)),
-               const SizedBox(width: 16),
-               Expanded(child: _buildDatePicker('${'financial_year_end_label'.tr} *', controller.financialYearEnd)),
-             ],
-           ),
+           // Financial Year Start - Full Width
+           _buildDatePicker('${'financial_year_start_label'.tr} *', controller.financialYearStart),
+           const SizedBox(height: 16),
+           
+           // Financial Year End - Full Width
+           _buildDatePicker('${'financial_year_end_label'.tr} *', controller.financialYearEnd),
            const SizedBox(height: 16),
            
            _buildDropdownWithKeys(
@@ -383,6 +382,7 @@ class CompanyProfileView extends GetView<CompanyProfileController> {
                'services': 'biz_nature_services'.tr,
                'technology': 'biz_nature_technology'.tr,
                'real_estate': 'biz_nature_real_estate'.tr,
+               'other': 'biz_nature_other'.tr,
              },
              hint: 'nature_of_business_hint'.tr,
            ),

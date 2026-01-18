@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:fineye/core/constants/app_routes.dart';
@@ -13,6 +14,9 @@ const double vatTolerance = 0.05;
 class InvoiceListController extends GetxController {
   final UserInvoiceRepository _invoiceRepository = UserInvoiceRepository();
   final AuthService _authService = AuthService();
+  
+  // Stream subscription management
+  StreamSubscription<List<Invoice>>? _invoiceStreamSubscription;
   
   // Search & Filter
   final TextEditingController searchController = TextEditingController();
@@ -98,6 +102,9 @@ class InvoiceListController extends GetxController {
 
   @override
   void onClose() {
+    // Cancel stream subscription to prevent memory leaks and race conditions
+    _invoiceStreamSubscription?.cancel();
+    _invoiceStreamSubscription = null;
     searchController.dispose();
     super.onClose();
   }
@@ -176,6 +183,8 @@ class InvoiceListController extends GetxController {
     final user = _authService.currentUser;
     if (user == null) {
       // No authenticated user; clear list and stop.
+      _invoiceStreamSubscription?.cancel();
+      _invoiceStreamSubscription = null;
       invoices.clear();
       filteredInvoices.clear();
       isLoading.value = false;
@@ -185,6 +194,10 @@ class InvoiceListController extends GetxController {
       );
       return;
     }
+
+    // CRITICAL: Cancel previous subscription to prevent multiple active streams
+    _invoiceStreamSubscription?.cancel();
+    _invoiceStreamSubscription = null;
 
     isLoading.value = true;
 
@@ -199,55 +212,86 @@ class InvoiceListController extends GetxController {
     }
 
     // Listen to Firestore stream for this user's invoices in `user_invoices`.
-    invoiceStream.listen((firestoreInvoices) {
-      // Assess risks for all invoices
-      final updatedInvoices = firestoreInvoices.map((invoice) {
-        final risks = assessInvoiceRisks(invoice, firestoreInvoices);
-        return invoice.copyWith(risks: risks);
-      }).toList();
+    _invoiceStreamSubscription = invoiceStream.listen(
+      (firestoreInvoices) {
+        debugPrint('📥 Invoice stream update: ${firestoreInvoices.length} invoices received');
+        
+        // Assess risks for all invoices
+        final updatedInvoices = firestoreInvoices.map((invoice) {
+          final risks = assessInvoiceRisks(invoice, firestoreInvoices);
+          return invoice.copyWith(risks: risks);
+        }).toList();
 
-      invoices.assignAll(updatedInvoices);
-      _applyFilters();
-      isLoading.value = false;
-    }, onError: (error) {
-      print('Error loading invoices: $error');
-      
-      // Check if it's an index error - try fallback
-      final errorStr = error.toString();
-      if (errorStr.contains('index') || errorStr.contains('failed-precondition')) {
-        // Extract the index creation URL if present
-        final urlMatch = RegExp(r'https://[^\s]+').firstMatch(errorStr);
-        final indexUrl = urlMatch?.group(0);
+        // Update invoices list
+        invoices.assignAll(updatedInvoices);
+        debugPrint('✅ Updated invoices list: ${invoices.length} total invoices');
         
-        print('⚠️ Index error detected. Trying fallback query...');
-        if (indexUrl != null) {
-          print('🔗 Create index at: $indexUrl');
-        }
+        // Apply filters after updating invoices
+        _applyFilters();
+        isLoading.value = false;
+      },
+      onError: (error) {
+        debugPrint('❌ Error loading invoices: $error');
         
-        // Try fallback query without index
-        try {
-          _invoiceRepository.getInvoicesForUserWithoutIndex(user.uid).listen((firestoreInvoices) {
-            final updatedInvoices = firestoreInvoices.map((invoice) {
-              final risks = assessInvoiceRisks(invoice, firestoreInvoices);
-              return invoice.copyWith(risks: risks);
-            }).toList();
-            invoices.assignAll(updatedInvoices);
-            _applyFilters();
-            isLoading.value = false;
-            
-            // Log that we're using fallback (don't show annoying banner)
-            print('⚠️ Using fallback query (no index). Create index for better performance.');
-          }, onError: (fallbackError) {
-            print('Fallback query also failed: $fallbackError');
+        // Check if it's an index error - try fallback
+        final errorStr = error.toString();
+        if (errorStr.contains('index') || errorStr.contains('failed-precondition')) {
+          // Extract the index creation URL if present
+          final urlMatch = RegExp(r'https://[^\s]+').firstMatch(errorStr);
+          final indexUrl = urlMatch?.group(0);
+          
+          debugPrint('⚠️ Index error detected. Trying fallback query...');
+          if (indexUrl != null) {
+            debugPrint('🔗 Create index at: $indexUrl');
+          }
+          
+          // Cancel current subscription before creating new one
+          _invoiceStreamSubscription?.cancel();
+          
+          // Try fallback query without index
+          try {
+            _invoiceStreamSubscription = _invoiceRepository
+                .getInvoicesForUserWithoutIndex(user.uid)
+                .listen(
+              (firestoreInvoices) {
+                debugPrint('📥 Fallback stream update: ${firestoreInvoices.length} invoices received');
+                
+                final updatedInvoices = firestoreInvoices.map((invoice) {
+                  final risks = assessInvoiceRisks(invoice, firestoreInvoices);
+                  return invoice.copyWith(risks: risks);
+                }).toList();
+                
+                invoices.assignAll(updatedInvoices);
+                debugPrint('✅ Updated invoices list (fallback): ${invoices.length} total invoices');
+                
+                _applyFilters();
+                isLoading.value = false;
+                
+                // Log that we're using fallback (don't show annoying banner)
+                debugPrint('⚠️ Using fallback query (no index). Create index for better performance.');
+              },
+              onError: (fallbackError) {
+                debugPrint('❌ Fallback query also failed: $fallbackError');
+                SnackbarService.to.showError(
+                  'Error',
+                  'Failed to load invoices. Please check your connection.',
+                );
+                invoices.clear();
+                filteredInvoices.clear();
+                isLoading.value = false;
+              },
+            );
+          } catch (e) {
+            debugPrint('❌ Exception in fallback setup: $e');
             SnackbarService.to.showError(
               'Error',
-              'Failed to load invoices. Please check your connection.',
+              'Failed to load invoices: ${error.toString()}',
             );
             invoices.clear();
             filteredInvoices.clear();
             isLoading.value = false;
-          });
-        } catch (e) {
+          }
+        } else {
           SnackbarService.to.showError(
             'Error',
             'Failed to load invoices: ${error.toString()}',
@@ -256,20 +300,32 @@ class InvoiceListController extends GetxController {
           filteredInvoices.clear();
           isLoading.value = false;
         }
-      } else {
-        SnackbarService.to.showError(
-          'Error',
-          'Failed to load invoices: ${error.toString()}',
-        );
-        invoices.clear();
-        filteredInvoices.clear();
-        isLoading.value = false;
-      }
-    });
+      },
+    );
   }
 
   void _applyFilters() {
-    var result = invoices.toList();
+    // Start with all invoices
+    var result = List<Invoice>.from(invoices);
+
+    debugPrint('🔍🔍🔍 APPLYING FILTERS TO ${result.length} INVOICES 🔍🔍🔍');
+    debugPrint('  Filter state:');
+    debugPrint('    Supplier: "${filterSupplier.value}" (isEmpty: ${filterSupplier.value.isEmpty})');
+    debugPrint('    Category: "${filterCategory.value}" (isEmpty: ${filterCategory.value.isEmpty})');
+    debugPrint('    Statuses: ${filterStatuses.toList()} (count: ${filterStatuses.length})');
+    debugPrint('    Tax Type: "${filterTaxType.value}"');
+    debugPrint('    Min Amount: ${filterMinAmount.value}');
+    debugPrint('    Max Amount: ${filterMaxAmount.value}');
+    debugPrint('    Start Date: ${filterStartDate.value}');
+    debugPrint('    End Date: ${filterEndDate.value}');
+    
+    // Debug: Show sample invoice data
+    if (invoices.isNotEmpty) {
+      debugPrint('  Sample invoice data:');
+      invoices.take(3).forEach((inv) {
+        debugPrint('    - Supplier: "${inv.supplierName}", Category: "${inv.category}", Status: "${inv.status}", Tax: "${inv.taxBadge}"');
+      });
+    }
 
     // Apply search query
     if (searchQuery.value.isNotEmpty) {
@@ -280,43 +336,173 @@ class InvoiceListController extends GetxController {
               inv.id.toLowerCase().contains(query) ||
               inv.grossAmount.toString().contains(query))
           .toList();
+      debugPrint('  ✅ After search: ${result.length} invoices');
     }
 
     // Apply risk filter
     if (riskFilter.value == 'with_risk') {
       result = result.where((inv) => inv.hasRisk).toList();
+      debugPrint('  ✅ After risk filter (with_risk): ${result.length} invoices');
     } else if (riskFilter.value == 'no_risk') {
       result = result.where((inv) => !inv.hasRisk).toList();
+      debugPrint('  ✅ After risk filter (no_risk): ${result.length} invoices');
     }
 
-    // Apply advanced filters from InvoiceFiltersController
+    // Date filters
     if (filterStartDate.value != null) {
-      result = result.where((inv) => inv.date.isAfter(filterStartDate.value!.subtract(const Duration(days: 1)))).toList();
+      final startDate = filterStartDate.value!;
+      final beforeCount = result.length;
+      result = result.where((inv) {
+        // Include invoices on or after start date
+        return inv.date.isAfter(startDate.subtract(const Duration(days: 1))) || 
+               inv.date.isAtSameMomentAs(startDate);
+      }).toList();
+      debugPrint('  ✅ After start date: ${result.length} invoices (was $beforeCount)');
     }
     if (filterEndDate.value != null) {
-      result = result.where((inv) => inv.date.isBefore(filterEndDate.value!.add(const Duration(days: 1)))).toList();
+      final endDate = filterEndDate.value!;
+      final beforeCount = result.length;
+      result = result.where((inv) {
+        // Include invoices on or before end date
+        return inv.date.isBefore(endDate.add(const Duration(days: 1))) || 
+               inv.date.isAtSameMomentAs(endDate);
+      }).toList();
+      debugPrint('  ✅ After end date: ${result.length} invoices (was $beforeCount)');
     }
-    if (filterSupplier.value.isNotEmpty && filterSupplier.value != 'All suppliers') {
-      result = result.where((inv) => inv.supplierName == filterSupplier.value).toList();
+    
+    // Supplier filter - COMPLETELY REBUILT
+    final supplierFilter = filterSupplier.value.trim();
+    if (supplierFilter.isNotEmpty && supplierFilter != 'All suppliers') {
+      final beforeCount = result.length;
+      debugPrint('  🔍 SUPPLIER FILTER: "$supplierFilter"');
+      
+      result = result.where((inv) {
+        final invSupplier = inv.supplierName.trim();
+        final invLower = invSupplier.toLowerCase();
+        final filterLower = supplierFilter.toLowerCase();
+        
+        // Try exact match first
+        if (invLower == filterLower) {
+          debugPrint('    ✅ Exact match: "$invSupplier" == "$supplierFilter"');
+          return true;
+        }
+        
+        // Try contains match
+        if (invLower.contains(filterLower) || filterLower.contains(invLower)) {
+          debugPrint('    ✅ Contains match: "$invSupplier" contains "$supplierFilter"');
+          return true;
+        }
+        
+        return false;
+      }).toList();
+      
+      debugPrint('  ✅ After supplier filter: ${result.length} invoices (was $beforeCount)');
+      if (result.isEmpty && beforeCount > 0) {
+        debugPrint('    ❌ NO MATCHES! Available suppliers:');
+        invoices.map((inv) => inv.supplierName.trim()).toSet().take(10).forEach((s) {
+          debugPrint('      - "$s"');
+        });
+      }
     }
-    if (filterCategory.value.isNotEmpty && filterCategory.value != 'All categories') {
-      result = result.where((inv) => inv.category == filterCategory.value).toList();
+    
+    // Category filter - COMPLETELY REBUILT
+    final categoryFilter = filterCategory.value.trim();
+    if (categoryFilter.isNotEmpty && categoryFilter != 'All categories') {
+      final beforeCount = result.length;
+      debugPrint('  🔍 CATEGORY FILTER: "$categoryFilter"');
+      
+      result = result.where((inv) {
+        final invCategory = inv.category.trim();
+        final invLower = invCategory.toLowerCase();
+        final filterLower = categoryFilter.toLowerCase();
+        
+        final matches = invLower == filterLower;
+        if (matches) {
+          debugPrint('    ✅ Match: "$invCategory" == "$categoryFilter"');
+        }
+        return matches;
+      }).toList();
+      
+      debugPrint('  ✅ After category filter: ${result.length} invoices (was $beforeCount)');
+      if (result.isEmpty && beforeCount > 0) {
+        debugPrint('    ❌ NO MATCHES! Available categories:');
+        invoices.map((inv) => inv.category.trim()).toSet().take(10).forEach((c) {
+          debugPrint('      - "$c"');
+        });
+        debugPrint('    Looking for: "$categoryFilter"');
+      }
     }
+    
+    // Status filter - COMPLETELY REBUILT
     if (filterStatuses.isNotEmpty) {
-      result = result.where((inv) => filterStatuses.contains(inv.status)).toList();
+      final beforeCount = result.length;
+      final statusFilters = filterStatuses.map((s) => s.trim().toLowerCase()).toList();
+      debugPrint('  🔍 STATUS FILTER: $statusFilters');
+      
+      result = result.where((inv) {
+        final invStatus = inv.status.trim().toLowerCase();
+        final matches = statusFilters.contains(invStatus);
+        if (matches) {
+          debugPrint('    ✅ Match: "$invStatus" in $statusFilters');
+        }
+        return matches;
+      }).toList();
+      
+      debugPrint('  ✅ After status filter: ${result.length} invoices (was $beforeCount)');
+      if (result.isEmpty && beforeCount > 0) {
+        debugPrint('    ❌ NO MATCHES! Available statuses:');
+        invoices.map((inv) => inv.status.trim()).toSet().forEach((s) {
+          debugPrint('      - "$s"');
+        });
+        debugPrint('    Looking for: $statusFilters');
+      }
     }
-    if (filterTaxType.value != 'All tax types') {
-      result = result.where((inv) => inv.taxBadge == filterTaxType.value).toList();
+    
+    // Tax type filter - COMPLETELY REBUILT
+    final taxTypeFilter = filterTaxType.value.trim();
+    if (taxTypeFilter.isNotEmpty && taxTypeFilter != 'All tax types') {
+      final beforeCount = result.length;
+      debugPrint('  🔍 TAX TYPE FILTER: "$taxTypeFilter"');
+      
+      result = result.where((inv) {
+        final invTaxBadge = inv.taxBadge.trim();
+        final invLower = invTaxBadge.toLowerCase();
+        final filterLower = taxTypeFilter.toLowerCase();
+        
+        final matches = invLower == filterLower;
+        if (!matches) {
+          debugPrint('    ❌ Mismatch: "$invTaxBadge" != "$taxTypeFilter"');
+        } else {
+          debugPrint('    ✅ Match: "$invTaxBadge" == "$taxTypeFilter"');
+        }
+        return matches;
+      }).toList();
+      
+      debugPrint('  ✅ After tax type filter: ${result.length} invoices (was $beforeCount)');
+      if (result.isEmpty && beforeCount > 0) {
+        debugPrint('    ❌ NO MATCHES! Available tax badges:');
+        invoices.map((inv) => inv.taxBadge.trim()).toSet().forEach((t) {
+          debugPrint('      - "$t"');
+        });
+        debugPrint('    Looking for: "$taxTypeFilter"');
+      }
     }
+    
+    // Amount filters
     if (filterMinAmount.value > 0) {
+      final beforeCount = result.length;
       result = result.where((inv) => inv.grossAmount >= filterMinAmount.value).toList();
+      debugPrint('  ✅ After min amount (${filterMinAmount.value}): ${result.length} invoices (was $beforeCount)');
     }
     if (filterMaxAmount.value > 0) {
+      final beforeCount = result.length;
       result = result.where((inv) => inv.grossAmount <= filterMaxAmount.value).toList();
+      debugPrint('  ✅ After max amount (${filterMaxAmount.value}): ${result.length} invoices (was $beforeCount)');
     }
 
+    // Always update filteredInvoices, even if empty
     filteredInvoices.assignAll(result);
-    print('🔍 Applied filters: ${result.length} invoices shown out of ${invoices.length} total');
+    debugPrint('🎯 FINAL RESULT: ${result.length} invoices shown out of ${invoices.length} total');
   }
 
   Future<void> toggleFlag(Invoice invoice) async {
@@ -340,26 +526,65 @@ class InvoiceListController extends GetxController {
   void showFilterOptions() async {
     final result = await Get.toNamed(AppRoutes.invoiceFilters);
     if (result != null && result is Map) {
+      debugPrint('🔍 Received filter result: $result');
+      
       // Apply filters from result
       filterStartDate.value = result['startDate'] as DateTime?;
       filterEndDate.value = result['endDate'] as DateTime?;
-      filterSupplier.value = result['supplier'] as String? ?? '';
-      filterCategory.value = result['category'] as String? ?? '';
-      filterStatuses.assignAll((result['statuses'] as List<dynamic>?)?.cast<String>() ?? []);
-      filterTaxType.value = result['taxType'] as String? ?? 'All tax types';
       
-      // Parse amount filters
+      // Handle supplier - convert null or "All suppliers" to empty string
+      final supplierValue = result['supplier'] as String?;
+      if (supplierValue == null || supplierValue.isEmpty || supplierValue == 'All suppliers') {
+        filterSupplier.value = '';
+      } else {
+        filterSupplier.value = supplierValue.trim(); // Trim whitespace
+      }
+      debugPrint('  - Supplier filter set to: "${filterSupplier.value}" (original: "$supplierValue")');
+      
+      // Handle category - convert null or "All categories" to empty string
+      final categoryValue = result['category'] as String?;
+      if (categoryValue == null || categoryValue.isEmpty || categoryValue == 'All categories') {
+        filterCategory.value = '';
+      } else {
+        filterCategory.value = categoryValue.trim(); // Trim whitespace
+      }
+      debugPrint('  - Category filter set to: "${filterCategory.value}" (original: "$categoryValue")');
+      
+      final statusList = (result['statuses'] as List<dynamic>?)?.cast<String>() ?? [];
+      filterStatuses.assignAll(statusList.map((s) => s.trim()).toList());
+      debugPrint('  - Status filters: ${filterStatuses.toList()}');
+      
+      // Handle tax type - convert null to "All tax types"
+      final taxTypeValue = result['taxType'] as String?;
+      if (taxTypeValue == null || taxTypeValue.trim().isEmpty || taxTypeValue == 'All tax types') {
+        filterTaxType.value = 'All tax types';
+      } else {
+        filterTaxType.value = taxTypeValue.trim(); // Trim whitespace
+      }
+      debugPrint('  - Tax type filter set to: "${filterTaxType.value}" (original: "$taxTypeValue")');
+      
+      // Parse amount filters - handle "AED 1000" format
       final minAmountStr = result['minAmount'] as String? ?? '';
       final maxAmountStr = result['maxAmount'] as String? ?? '';
-      filterMinAmount.value = minAmountStr.isNotEmpty ? double.tryParse(minAmountStr) ?? 0.0 : 0.0;
-      filterMaxAmount.value = maxAmountStr.isNotEmpty ? double.tryParse(maxAmountStr) ?? 0.0 : 0.0;
+      
+      // Extract numbers from strings (handles "AED 1000", "1000", "1,000", etc.)
+      double? parseAmount(String? str) {
+        if (str == null || str.isEmpty) return 0.0;
+        // Remove currency symbols, commas, and whitespace
+        final cleaned = str.replaceAll(RegExp(r'[AED\s,]+'), '').trim();
+        return double.tryParse(cleaned) ?? 0.0;
+      }
+      
+      filterMinAmount.value = parseAmount(minAmountStr) ?? 0.0;
+      filterMaxAmount.value = parseAmount(maxAmountStr) ?? 0.0;
+      debugPrint('  - Amount range: ${filterMinAmount.value} - ${filterMaxAmount.value} (from "$minAmountStr" / "$maxAmountStr")');
       
       // Reapply filters
       _applyFilters();
       
       SnackbarService.to.showInfo(
         'title_filters_applied'.tr, 
-        'Filters applied successfully',
+        'msg_filters_applied_success'.tr,
       );
     }
   }
@@ -426,6 +651,10 @@ class InvoiceListController extends GetxController {
 
   // Refresh invoices manually
   Future<void> refreshInvoices() async {
+    debugPrint('🔄 Manual refresh triggered');
+    // Cancel existing subscription and reload
+    _invoiceStreamSubscription?.cancel();
+    _invoiceStreamSubscription = null;
     loadInvoices();
   }
 
@@ -439,8 +668,8 @@ class InvoiceListController extends GetxController {
       final success = await _invoiceRepository.deleteInvoice(docId);
       if (success) {
         SnackbarService.to.showSuccess(
-          'Success',
-          'Invoice deleted successfully',
+          'title_success'.tr,
+          'msg_invoice_deleted_success'.tr,
         );
         // The invoice list will automatically update via the Firestore stream
       } else {

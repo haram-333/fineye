@@ -62,43 +62,43 @@ class _OtpInputRowState extends State<OtpInputRow> {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(6, (index) {
-          return Container(
-            width: fieldWidth,
-            height: fieldHeight,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(
-                color: const Color(0xFFE0E0E0), // Light grey border
-                width: 1,
-              ),
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(6, (index) {
+        return Container(
+          width: fieldWidth,
+          height: fieldHeight,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(
+              color: const Color(0xFFE0E0E0), // Light grey border
+              width: 1,
             ),
-            child: Center(
-              child: TextField(
-                controller: _controllers[index],
-                focusNode: _focusNodes[index],
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
+          ),
+          child: Center(
+            child: TextField(
+              controller: _controllers[index],
+              focusNode: _focusNodes[index],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
                 textDirection: TextDirection.ltr, // Force LTR for text input
-                maxLength: 1,
-                style: TextStyle(
-                  fontSize: fontSize, 
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryBlue
-                ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  counterText: '',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                onChanged: (value) => _onChanged(value, index),
+              maxLength: 1,
+              style: TextStyle(
+                fontSize: fontSize, 
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryBlue
               ),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                counterText: '',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: (value) => _onChanged(value, index),
             ),
-          );
-        }),
+          ),
+        );
+      }),
       ),
     );
   }

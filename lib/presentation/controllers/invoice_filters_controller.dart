@@ -19,7 +19,7 @@ class InvoiceFiltersController extends GetxController {
 
   // Status
   final selectedStatuses = <String>[].obs;
-  final allStatuses = ['Approved', 'Paid', 'Review', 'Flagged'];
+  final allStatuses = ['Paid', 'Pending', 'Review'];
 
   // Tax Type
   final selectedTaxType = 'All tax types'.obs;
@@ -36,24 +36,34 @@ class InvoiceFiltersController extends GetxController {
     setToThisMonth();
     // Load suppliers and categories from actual invoices
     _loadDynamicData();
+    
+    // Reload dynamic data when invoices change
+    if (Get.isRegistered<InvoiceListController>()) {
+      final invoiceController = Get.find<InvoiceListController>();
+      ever(invoiceController.invoices, (_) {
+        _loadDynamicData();
+      });
+    }
   }
   
   void _loadDynamicData() {
     if (Get.isRegistered<InvoiceListController>()) {
       final invoiceController = Get.find<InvoiceListController>();
       
-      // Extract unique suppliers
+      // Extract unique suppliers (trim and filter out empty/unknown)
       final uniqueSuppliers = invoiceController.invoices
-          .map((inv) => inv.supplierName)
-          .where((name) => name.isNotEmpty)
+          .map((inv) => inv.supplierName.trim())
+          .where((name) => name.isNotEmpty && 
+                          name.toLowerCase() != 'unknown' && 
+                          name.toLowerCase() != 'unknown supplier')
           .toSet()
           .toList();
       uniqueSuppliers.sort();
       suppliers.value = ['All suppliers', ...uniqueSuppliers];
       
-      // Extract unique categories
+      // Extract unique categories (trim and filter out empty)
       final uniqueCategories = invoiceController.invoices
-          .map((inv) => inv.category)
+          .map((inv) => inv.category.trim())
           .where((cat) => cat.isNotEmpty)
           .toSet()
           .toList();
@@ -61,7 +71,14 @@ class InvoiceFiltersController extends GetxController {
       categories.value = ['All categories', ...uniqueCategories];
       
       print('✅ Loaded ${uniqueSuppliers.length} suppliers and ${uniqueCategories.length} categories');
+      print('  Suppliers: ${uniqueSuppliers.take(5).toList()}');
+      print('  Categories: ${uniqueCategories.take(5).toList()}');
     }
+  }
+  
+  /// Reload dynamic data (call this when invoices are updated)
+  void reloadDynamicData() {
+    _loadDynamicData();
   }
 
   void onDateSelected(DateTime? start, DateTime? end) {
@@ -111,7 +128,10 @@ class InvoiceFiltersController extends GetxController {
   }
 
   void clearAll() {
-    setToThisMonth();
+    // Clear date range completely (don't set to this month)
+    startDate.value = null;
+    endDate.value = null;
+    selectedPeriod.value = ''; // Clear period selection
     selectedSupplier.value = null;
     selectedCategory.value = null;
     selectedStatuses.clear();
@@ -121,13 +141,25 @@ class InvoiceFiltersController extends GetxController {
   }
 
   void applyFilters() {
+    // Normalize filter values before passing back
+    // Convert "All suppliers" / "All categories" to null/empty
+    final supplierValue = (selectedSupplier.value == null || 
+                           selectedSupplier.value == 'All suppliers') 
+        ? null 
+        : selectedSupplier.value;
+    
+    final categoryValue = (selectedCategory.value == null || 
+                          selectedCategory.value == 'All categories') 
+        ? null 
+        : selectedCategory.value;
+    
     // Implement apply logic and pass back to previous screen
     Get.back(result: {
       'startDate': startDate.value,
       'endDate': endDate.value,
-      'supplier': selectedSupplier.value,
-      'category': selectedCategory.value,
-      'statuses': selectedStatuses,
+      'supplier': supplierValue,
+      'category': categoryValue,
+      'statuses': selectedStatuses.toList(), // Convert to regular list
       'taxType': selectedTaxType.value,
       'minAmount': minAmountController.text,
       'maxAmount': maxAmountController.text,

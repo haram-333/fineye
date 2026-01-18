@@ -937,17 +937,32 @@ class InvoiceDetailsView extends GetView<InvoiceDetailsController> {
     );
   }
 
-  Widget _buildChip(String label) {
+  Widget _buildChip(String translationKey) {
+    // Map translation keys back to English category values (same as stored in Firestore)
+    final Map<String, String> translationKeyToCategory = {
+      'cat_utilities': 'Utilities',
+      'cat_rent': 'Rent',
+      'cat_office_supplies': 'Office supplies',
+      'cat_marketing': 'Marketing',
+      'cat_maintenance': 'Maintenance',
+      'cat_transport': 'Transport',
+      'cat_subscriptions': 'Subscriptions',
+      'cat_professional_fees': 'Professional fees',
+      'cat_other': 'Other',
+    };
+    
+    // Get the English category value (what's stored in Firestore)
+    final categoryValue = translationKeyToCategory[translationKey] ?? 'Other';
+    
     return ActionChip(
-      label: Text(label),
+      label: Text(translationKey.tr), // Display translated label
       backgroundColor: const Color(0xFFF3F4F6),
       labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF374151), fontWeight: FontWeight.w500),
       side: BorderSide.none,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       onPressed: () {
-        // Simple logic to set category
-        // In real app, map label back to internal value if needed
-        controller.selectedCategory.value = label; 
+        // Save the English category value (not the translated label)
+        controller.selectedCategory.value = categoryValue;
       },
     );
   }
@@ -1241,18 +1256,32 @@ class InvoiceDetailsView extends GetView<InvoiceDetailsController> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Due Date',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF6B7280)),
+                Row(
+                  children: [
+                    Text(
+                      'Due Date',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF6B7280)),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      '*',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 6),
                 GestureDetector(
                   onTap: controller.selectDueDate,
-                  child: Container(
+                  child: Obx(() => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                      border: Border.all(
+                        color: controller.dueDate.value == null 
+                            ? Colors.red.withValues(alpha: 0.5)
+                            : const Color(0xFFD1D5DB),
+                        width: controller.dueDate.value == null ? 1.5 : 1,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -1273,8 +1302,18 @@ class InvoiceDetailsView extends GetView<InvoiceDetailsController> {
                         const Icon(Icons.calendar_today, size: 18, color: Color(0xFF9CA3AF)),
                       ],
                     ),
-                  ),
+                  )),
                 ),
+                if (controller.dueDate.value == null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Due date is required for unpaid invoices',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red.shade600,
+                    ),
+                  ),
+                ],
               ],
             );
           }),
@@ -1649,12 +1688,8 @@ class InvoiceDetailsView extends GetView<InvoiceDetailsController> {
           key: ValueKey('money_$label'), // Unique key to prevent rebuild issues
           controller: textController,
           readOnly: false,
-          onChanged: (text) {
-            // Allow free editing - just pass the text directly
-            if (onChanged != null) {
-              onChanged(text);
-            }
-          },
+          // REMOVED onChanged - let the controller listener handle updates
+          // This prevents any interference with user typing
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF111827)),
           decoration: InputDecoration(

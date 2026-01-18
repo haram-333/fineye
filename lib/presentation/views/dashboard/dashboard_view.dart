@@ -17,8 +17,17 @@ class DashboardView extends GetView<DashboardController> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          controller.loadDashboardData();
+          // Also refresh invoice list if available
+          if (Get.isRegistered<InvoiceListController>()) {
+            await Get.find<InvoiceListController>().refreshInvoices();
+          }
+        },
+        color: AppColors.primaryBlue,
+        child: CustomScrollView(
+          slivers: [
           SliverAppBar(
             floating: true,
             snap: true,
@@ -386,6 +395,7 @@ _buildOverviewCard(
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -920,64 +930,64 @@ _buildOverviewCard(
 
           // Only show deadline section if there's a deadline date
           if (deadlineDate.isNotEmpty && deadlineTitle.isNotEmpty) ...[
-            const SizedBox(height: 20),
+          const SizedBox(height: 20),
 
-            // Next deadline section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    deadlineTitle,
-                    style: TextStyle(
-                      color: isCtPanel ? Colors.white : color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+          // Next deadline section
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  deadlineTitle,
+                  style: TextStyle(
+                    color: isCtPanel ? Colors.white : color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+                if (daysLeft.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2), // Darker badge background
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  daysLeft,
+                  style: TextStyle(
+                    color: isCtPanel ? Colors.white : color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (daysLeft.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2), // Darker badge background
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      daysLeft,
-                      style: TextStyle(
-                        color: isCtPanel ? Colors.white : color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+              ),
                 ],
-              ],
+            ],
+          ),
+
+          const SizedBox(height: 4),
+
+          Text(
+            deadlineDate,
+            style: TextStyle(
+              color: isCtPanel ? Colors.white.withValues(alpha: 0.8) : color.withValues(alpha: 0.8),
+              fontSize: 12,
             ),
+          ),
 
-            const SizedBox(height: 4),
-
+          if (reminderText != null) ...[
+            const SizedBox(height: 8),
             Text(
-              deadlineDate,
+              reminderText,
               style: TextStyle(
-                color: isCtPanel ? Colors.white.withValues(alpha: 0.8) : color.withValues(alpha: 0.8),
+                color: isCtPanel ? Colors.white.withValues(alpha: 0.7) : color.withValues(alpha: 0.7),
                 fontSize: 12,
               ),
             ),
-
-            if (reminderText != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                reminderText,
-                style: TextStyle(
-                  color: isCtPanel ? Colors.white.withValues(alpha: 0.7) : color.withValues(alpha: 0.7),
-                  fontSize: 12,
-                ),
-              ),
             ],
           ],
         ],

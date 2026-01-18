@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:fineye/presentation/controllers/invoice_filters_controller.dart';
+import 'package:fineye/presentation/controllers/invoice_list_controller.dart';
 import 'package:fineye/core/constants/app_colors.dart';
 import 'package:fineye/core/services/snackbar_service.dart';
 
@@ -281,7 +282,16 @@ class InvoiceFiltersView extends GetView<InvoiceFiltersController> {
           Obx(() => DropdownButtonFormField<String>(
             value: controller.selectedCategory.value,
             hint: Text('all_categories'.tr, style: const TextStyle(color: Colors.grey)),
-            items: controller.categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+            items: controller.categories.map((c) {
+              // Display translated label, but store English value
+              String displayText = c;
+              if (c != 'All categories') {
+                // Try to get translation key for this category
+                final translationKey = InvoiceListController.getCategoryTranslationKey(c);
+                displayText = translationKey.tr;
+              }
+              return DropdownMenuItem(value: c, child: Text(displayText));
+            }).toList(),
             onChanged: (val) => controller.selectedCategory.value = val,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -319,9 +329,6 @@ class InvoiceFiltersView extends GetView<InvoiceFiltersController> {
         break;
       case 'Review':
         color = const Color(0xFF3B82F6);
-        break;
-      case 'Flagged':
-        color = const Color(0xFFEF4444);
         break;
       default:
         color = Colors.grey;

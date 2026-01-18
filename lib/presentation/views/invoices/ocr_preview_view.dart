@@ -34,6 +34,8 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
                     const SizedBox(height: 16),
                     _buildStructuredFieldsSection(),
                     const SizedBox(height: 24),
+                    _buildAdditionalFieldsSection(),
+                    const SizedBox(height: 24),
                     _buildRawOcrTextSection(),
                     const SizedBox(height: 24),
                     _buildAmountsSection(),
@@ -349,6 +351,38 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
         ],
       ),
     );
+  }
+
+  Widget _buildAdditionalFieldsSection() {
+    return Obx(() {
+      if (controller.additionalFields.isEmpty) return const SizedBox.shrink();
+
+      return _buildSection(
+        'additional_details'.tr, 
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: controller.additionalFields.entries.map((entry) {
+            final key = entry.key;
+            // Prettify key
+            final label = key.replaceAll('_', ' ').capitalizeFirst ?? key;
+
+            // Get controller if exists
+            final textController = controller.pAdditionalControllers[key] ??
+                TextEditingController(text: entry.value);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildTextField(
+                label: label,
+                controller: textController,
+                icon: Icons.info_outline,
+                hint: '',
+              ),
+            );
+          }).toList(),
+        ),
+      );
+    });
   }
   
   Widget _buildTextField({

@@ -737,64 +737,107 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
     };
     
     const fullText = document?.text || '';
+    const entities = document?.entities || [];
+    const detectedLanguages = document?.pages?.[0]?.detectedLanguages || [];
     
-    // Check if text contains Arabic characters (even if garbled)
-    const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-    const hasArabicChars = arabicPattern.test(fullText);
-    if (hasArabicChars) {
-      console.log(`✅ Document AI: Found Arabic characters in extracted text!`);
-    } else {
-      console.log(`⚠️ Document AI: No Arabic characters detected in text (might be garbled by Invoice Parser)`);
-    }
-    
-    // Extract detected languages from pages (important for Arabic detection)
-    const detectedLanguages = [];
-    if (document?.pages && document.pages.length > 0) {
-      for (const page of document.pages) {
-        if (page.detectedLanguages && page.detectedLanguages.length > 0) {
-          for (const lang of page.detectedLanguages) {
-            detectedLanguages.push({
-              languageCode: lang.languageCode,
-              confidence: lang.confidence || 0,
-            });
+      // Check for Arabic in the response
+          if (fullText && fullText.length > 0) {
+            const arabicRegex = /[\u0600-\u06FF]/;
+            const containsArabic = arabicRegex.test(fullText);
+            console.log(`📊 Document AI: Contains Arabic: ${containsArabic}`);
+            if (containsArabic) {
+              console.log('✅ Document AI: Arabic text detected in response!');
+            }
           }
-        }
-      }
-    }
-    
-    console.log(`🌐 Document AI: Detected languages: ${detectedLanguages.map(l => `${l.languageCode} (${(l.confidence * 100).toFixed(1)}%)`).join(', ') || 'none'}`);
-    
-    // Document OCR returns raw text, Invoice Parser returns structured entities
-    // Check if we have entities (Invoice Parser) or just text (Document OCR)
-    const hasEntities = document?.entities && document.entities.length > 0;
-    
+
+          // ---------------------------------------------------------
+          // NEW: Gemini LLM Extraction Layer
+          // ---------------------------------------------------------
+          // If we have text but no entities (Document OCR), OR if we just want better accuracy,
+          // we send the text to Gemini Flash to get perfect JSON.
+          if (process.env.GEMINI_API_KEY && fullText.length > 10) {
+            try {
+              console.log('✨ Gemini: Starting intelligent extraction...');
+              const { GoogleGenerativeAI } = require("@google/generative-ai");
+              const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+              const model = genAI.getGenerativeModel({ 
+                model: "gemini-1.5-flash",
+                generationConfig: { responseMimeType: "application/json" }
+              });
+
+              const prompt = `
+                You are an expert invoice data extractor. 
+                Extract the following fields from this invoice text and return ONLY a valid JSON object.
+                
+                Fields to extract:
+                - supplier_name (string): Name of the vendor/company/supplier. Be precise.
+                - invoice_date (string): Date of the invoice in YYYY-MM-DD format.
+                - invoice_number (string): The invoice identifier/number.
+                - total_amount (number): The generic total/grand total.
+                - net_amount (number): The amount before tax/VAT.
+                - tax_amount (number): The VAT/Tax amount.
+                - currency (string): The currency code (e.g., AED, USD).
+                
+                Rules:
+                - If a field is not found, set it to null.
+                - The text contains Arabic and English. Handle both.
+                - Return CAREFULLY parsed numbers (no commas).
+                
+                Invoice Text:
+                """
+                ${fullText}
+                """
+              `;
+
+              const result = await model.generateContent(prompt);
+              const response = await result.response;
+              const text = response.text();
+              console.log('✨ Gemini: Extraction complete!');
+              console.log('✨ Gemini: Raw response:', text);
+
+              const geminiData = JSON.parse(text);
+              
+              // Merge Gemini data into our response structure
+              // We simulate "entities" so the frontend (OCRController) handles it seamlessly
+              if (geminiData) {
+                const geminiEntities = [];
+                if (geminiData.supplier_name) geminiEntities.push({ type: 'supplier_name', value: geminiData.supplier_name, confidence: 0.95 });
+                if (geminiData.invoice_number) geminiEntities.push({ type: 'invoice_id', value: geminiData.invoice_number, confidence: 0.95 });
+                if (geminiData.invoice_date) geminiEntities.push({ type: 'invoice_date', value: geminiData.invoice_date, confidence: 0.95 }); // YYYY-MM-DD matches default parser
+                if (geminiData.total_amount) geminiEntities.push({ type: 'total_amount', value: String(geminiData.total_amount), confidence: 0.95 });
+                if (geminiData.net_amount) geminiEntities.push({ type: 'net_amount', value: String(geminiData.net_amount), confidence: 0.95 });
+                if (geminiData.tax_amount) geminiEntities.push({ type: 'tax_amount', value: String(geminiData.tax_amount), confidence: 0.95 });
+
+                // Overwrite/Append extracted data
+                return res.json({
+                  success: true,
+                  data: {
+                    fullText: fullText,
+                    entities: geminiEntities, // Frontend will love this
+                    detectedLanguages: detectedLanguages,
+                    source: 'gemini_flash'
+                  }
+                });
+              }
+            } catch (geminiError) {
+              console.error('❌ Gemini Extraction Failed:', geminiError);
+              console.log('⚠️ Falling back to raw Document AI output');
+              // Fallthrough to return original Document AI result if Gemini fails
+            }
+          }
+          // ---------------------------------------------------------
+          
     let extractedData;
     
-    if (hasEntities) {
-      // Invoice Parser format - structured entities
-      const entities = document.entities || [];
+    // Check if we have structured entities (Invoice Parser)
+    if (entities && entities.length > 0) {
       extractedData = {
         fullText: fullText,
-        entities: entities.map(entity => {
-          // Extract text value using textAnchor (as per official samples)
-          const textValue = entity.textAnchor 
-            ? getTextFromAnchor(entity.textAnchor, fullText)
-            : (entity.mentionText || '');
-          
-          return {
-            type: entity.type,
-            value: textValue,
-            confidence: entity.confidence || 0,
-            normalizedValue: entity.normalizedValue || null,
-          };
-        }),
+        entities: entities,
         detectedLanguages: detectedLanguages,
-        // Common invoice fields (if available) - use textAnchor extraction
-        invoiceNumber: entities.find(e => e.type === 'invoice_id' || e.type === 'invoice_number') 
-          ? getTextFromAnchor(entities.find(e => e.type === 'invoice_id' || e.type === 'invoice_number').textAnchor, fullText)
-          : null,
-        supplierName: entities.find(e => e.type === 'supplier_name' || e.type === 'supplier')
-          ? getTextFromAnchor(entities.find(e => e.type === 'supplier_name' || e.type === 'supplier').textAnchor, fullText)
+        source: 'document_ai',
+        supplierName: entities.find(e => e.type === 'supplier_name')
+          ? getTextFromAnchor(entities.find(e => e.type === 'supplier_name').textAnchor, fullText)
           : null,
         invoiceDate: entities.find(e => e.type === 'invoice_date')
           ? getTextFromAnchor(entities.find(e => e.type === 'invoice_date').textAnchor, fullText)
@@ -821,6 +864,7 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
         fullText: fullText,
         entities: [], // No structured entities from Document OCR
         detectedLanguages: detectedLanguages,
+        source: 'document_ai_ocr'
         // Fields will be parsed client-side using regex
       };
       console.log(`📄 Document OCR: Extracted ${fullText.length} characters of text`);

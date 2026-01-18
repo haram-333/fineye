@@ -1,12 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'notification_preferences_service.dart';
 
 /// Service for managing notifications in Firestore
 class NotificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationPreferencesService _prefsService = NotificationPreferencesService();
   
   /// Create a notification for a user (checks preferences first)
@@ -80,24 +78,52 @@ class NotificationService {
   /// Mark all notifications as read for a user
   Future<bool> markAllAsRead(String userId) async {
     try {
-      final batch = _firestore.batch();
       final notificationsRef = _firestore
           .collection('user_notifications')
           .doc(userId)
           .collection('notifications');
       
-      final snapshot = await notificationsRef
-          .where('isRead', isEqualTo: false)
-          .get();
+      // Get all notifications (not just unread ones) to ensure consistency
+      final snapshot = await notificationsRef.get();
       
-      for (var doc in snapshot.docs) {
-        batch.update(doc.reference, {
-          'isRead': true,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+      // If no notifications, return early
+      if (snapshot.docs.isEmpty) {
+        return true;
       }
       
-      await batch.commit();
+      // Filter documents that need to be updated
+      final docsToUpdate = snapshot.docs.where((doc) {
+        final data = doc.data();
+        return data['isRead'] != true;
+      }).toList();
+      
+      if (docsToUpdate.isEmpty) {
+        debugPrint('✅ All notifications already marked as read');
+        return true;
+      }
+      
+      // Use batch write for efficiency (max 500 operations per batch)
+      const int batchLimit = 500;
+      int processed = 0;
+      
+      while (processed < docsToUpdate.length) {
+        final batch = _firestore.batch();
+        final endIndex = (processed + batchLimit < docsToUpdate.length)
+            ? processed + batchLimit
+            : docsToUpdate.length;
+        
+        for (int i = processed; i < endIndex; i++) {
+          batch.update(docsToUpdate[i].reference, {
+            'isRead': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+        
+        await batch.commit();
+        processed = endIndex;
+      }
+      
+      debugPrint('✅ Marked ${docsToUpdate.length} notifications as read for user: $userId');
       return true;
     } catch (e) {
       debugPrint('❌ Failed to mark all notifications as read: $e');

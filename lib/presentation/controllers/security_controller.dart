@@ -92,8 +92,8 @@ class SecurityController extends GetxController {
           isBiometricEnabled.value = true;
           await _storageService.saveSecuritySettings(biometricEnabled: true);
           SnackbarService.to.showSuccess(
-            'Biometric Enabled',
-            'Biometric authentication has been enabled successfully.',
+            'title_biometric_enabled'.tr,
+            'msg_biometric_enabled_success'.tr,
           );
         }
       } on PlatformException catch (e) {

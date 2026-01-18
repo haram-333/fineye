@@ -22,13 +22,13 @@ class DataPrivacyController extends GetxController {
       await Future.delayed(const Duration(seconds: 2));
       
       SnackbarService.to.showSuccess(
-        'Export Complete',
-        'Your data has been exported successfully. Check your downloads folder.',
+        'title_export_complete'.tr,
+        'msg_data_export_success'.tr,
       );
     } catch (e) {
       SnackbarService.to.showError(
-        'Export Failed',
-        'Failed to export data: ${e.toString()}',
+        'title_export_failed'.tr,
+        'msg_data_export_error'.trParams({'error': e.toString()}),
       );
     }
   }
@@ -43,8 +43,8 @@ class DataPrivacyController extends GetxController {
       }
       
       SnackbarService.to.showSuccess(
-        'Cache Cleared',
-        'All cached data has been cleared successfully.',
+        'title_cache_cleared'.tr,
+        'msg_cache_cleared_success'.tr,
       );
     } catch (e) {
       SnackbarService.to.showError(

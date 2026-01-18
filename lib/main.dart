@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/services/screen_privacy_service.dart';
 import 'core/services/auto_lock_service.dart';
 import 'core/services/settings_storage_service.dart';
+import 'core/widgets/interaction_tracker.dart';
 // TEMPORARY: Remove after seeding data
 // import 'data/helpers/seed_invoice_data.dart';
 import 'core/constants/app_routes.dart';
@@ -22,6 +23,8 @@ import 'presentation/controllers/status_bar_controller.dart';
 import 'core/services/snackbar_service.dart';
 import 'presentation/views/invoices/invoice_details_view.dart';
 import 'presentation/controllers/invoice_details_controller.dart';
+import 'presentation/views/invoices/invoice_edit_view.dart';
+import 'presentation/controllers/invoice_edit_controller.dart';
 import 'presentation/views/invoices/invoice_filters_view.dart';
 import 'presentation/controllers/invoice_filters_controller.dart';
 import 'presentation/views/security/security_view.dart';
@@ -203,9 +206,11 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'FinEye',
       builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(1.0)),
-          child: child ?? const SizedBox(),
+        return InteractionTracker(
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(1.0)),
+            child: child ?? const SizedBox(),
+          ),
         );
       },
       theme: ThemeData(
@@ -305,6 +310,13 @@ class MyApp extends StatelessWidget {
           page: () => const InvoiceDetailsView(),
           binding: BindingsBuilder(() {
             Get.lazyPut<InvoiceDetailsController>(() => InvoiceDetailsController());
+          }),
+        ),
+        GetPage(
+          name: AppRoutes.invoiceEdit,
+          page: () => const InvoiceEditView(),
+          binding: BindingsBuilder(() {
+            Get.lazyPut<InvoiceEditController>(() => InvoiceEditController());
           }),
         ),
         GetPage(

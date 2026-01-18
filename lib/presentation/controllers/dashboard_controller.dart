@@ -487,8 +487,8 @@ class DashboardController extends GetxController {
       
       if (filePath != null) {
         SnackbarService.to.showSuccess(
-          'Export Complete',
-          'VAT summary exported successfully to Documents folder',
+          'title_export_complete'.tr,
+          'msg_vat_export_success'.tr,
           duration: const Duration(seconds: 3),
     );
       } else {

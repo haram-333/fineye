@@ -32,6 +32,11 @@ class OCRPreviewController extends GetxController {
   final TextEditingController supplierController = TextEditingController();
   final TextEditingController invoiceNumberController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
+  
+  // Dynamic Fields
+  final RxMap<String, String> additionalFields = <String, String>{}.obs;
+  // Map to hold controllers for dynamic fields so we can edit them
+  final Map<String, TextEditingController> pAdditionalControllers = {};
 
   // Reactive Variables
   final Rx<DateTime> invoiceDate = DateTime.now().obs;
@@ -199,6 +204,31 @@ class OCRPreviewController extends GetxController {
       if (extractedData.vatAmount != null) {
         vatAmount.value = extractedData.vatAmount;
         print('✅ Loaded VAT amount: ${extractedData.vatAmount}');
+      }
+      
+      // Load additional dynamic fields
+      additionalFields.clear();
+      pAdditionalControllers.clear();
+      
+      final handledTypes = [
+        'supplier_name', 'supplier',
+        'invoice_id', 'invoice_number',
+        'invoice_date', 'date',
+        'total_amount', 'total', 'gross_amount',
+        'net_amount', 'net',
+        'tax_amount', 'vat_amount', 'vat'
+      ];
+
+      if (extractedData.rawEntities.isNotEmpty) {
+        extractedData.rawEntities.forEach((key, value) {
+          // Normalize key to check against handled types
+          if (!handledTypes.contains(key) && value != null) {
+            final valStr = value.toString();
+            additionalFields[key] = valStr;
+            pAdditionalControllers[key] = TextEditingController(text: valStr);
+            print('✅ Loaded additional field: $key = $valStr');
+          }
+        });
       }
       
       // Auto-calculate if needed

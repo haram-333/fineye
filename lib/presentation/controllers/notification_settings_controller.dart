@@ -280,7 +280,7 @@ class NotificationSettingsController extends GetxController {
       
       SnackbarService.to.showSuccess(
         'title_success'.tr,
-        'Custom schedule saved successfully',
+        'msg_custom_schedule_saved'.tr,
       );
     }
   }

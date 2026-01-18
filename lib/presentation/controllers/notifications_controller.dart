@@ -242,15 +242,24 @@ class NotificationsController extends GetxController {
     
     try {
       final notificationService = NotificationService();
-      await notificationService.markAllAsRead(user.uid);
+      final success = await notificationService.markAllAsRead(user.uid);
       
-      // Update local state
-      for (var notification in notifications) {
-        notification.isRead = true;
+      if (success) {
+        // The Firestore stream will automatically update the UI
+        // when the batch commit completes, so we don't need to manually
+        // update local state. This ensures consistency with the database.
+        debugPrint('✅ Mark all as read completed successfully');
+      } else {
+        debugPrint('⚠️ Mark all as read returned false');
       }
-      notifications.refresh();
     } catch (e) {
       debugPrint('⚠️ Failed to mark all as read: $e');
+      // Show error to user if needed
+      Get.snackbar(
+        'Error',
+        'Failed to mark all notifications as read. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 

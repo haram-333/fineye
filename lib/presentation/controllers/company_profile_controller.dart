@@ -259,14 +259,14 @@ class CompanyProfileController extends GetxController {
       } else {
         SnackbarService.to.showError(
           'title_error'.tr,
-          result['error'] ?? 'Failed to save profile. Please try again.',
+          result['error'] ?? 'msg_profile_save_error'.tr,
         );
       }
     } catch (e) {
       // Error saving profile
       SnackbarService.to.showError(
         'title_error'.tr,
-        'An unexpected error occurred. Please try again.',
+        'msg_unexpected_error'.tr,
       );
     }
   }

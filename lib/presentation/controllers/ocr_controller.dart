@@ -457,6 +457,14 @@ class OCRController extends GetxController {
         ? 0.0 
         : confidences.reduce((a, b) => a + b) / confidences.length;
     
+    // Build raw entities map for dynamic fields
+    final rawEntities = <String, dynamic>{};
+    for (final entity in entities) {
+      if (entity['type'] != null) {
+        rawEntities[entity['type'].toString()] = entity['value'] ?? entity['mentionText'];
+      }
+    }
+
     return ExtractedInvoiceData(
       supplierName: supplierName,
       invoiceNumber: invoiceNumber,
@@ -465,6 +473,7 @@ class OCRController extends GetxController {
       vatAmount: vatAmount,
       grossAmount: grossAmount,
       overallConfidence: overallConfidence,
+      rawEntities: rawEntities,
     );
   }
   

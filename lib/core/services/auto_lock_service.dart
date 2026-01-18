@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:local_auth/local_auth.dart';
 import 'settings_storage_service.dart';
+import '../../data/services/auth_service.dart';
 
-/// Service to handle automatic app locking after period of inactivity
+/// Service to handle automatic session termination after period of inactivity (Banking Level Security)
 class AutoLockService {
   static AutoLockService? _instance;
   static AutoLockService get instance => _instance ??= AutoLockService._();
@@ -14,9 +14,8 @@ class AutoLockService {
   Timer? _inactivityTimer;
   DateTime _lastInteraction = DateTime.now();
   bool _isEnabled = true;
-  int _lockTimeoutMinutes = 3;
-  bool _isLocked = false;
-  final LocalAuthentication _localAuth = LocalAuthentication();
+  int _lockTimeoutSeconds = 15; // Set to 15s for testing as requested
+  bool _isLoggedOut = false;
   final SettingsStorageService _storageService = SettingsStorageService();
   
   /// Initialize the auto-lock service
@@ -28,25 +27,19 @@ class AutoLockService {
   Future<void> _loadSettings() async {
     final settings = await _storageService.loadSecuritySettings();
     _isEnabled = settings['autoLockEnabled'] as bool? ?? true;
-    final timeString = settings['autoLockTime'] as String? ?? '3m';
     
-    if (timeString == 'off') {
-      _isEnabled = false;
-      return;
-    }
-    
-    // Parse time string (e.g., "3m" -> 3 minutes)
-    final timeValue = int.tryParse(timeString.replaceAll('m', '')) ?? 3;
-    _lockTimeoutMinutes = timeValue;
+    // For testing, we are hardcoding 15s. 
+    // In production, this would be parsed from settings.
+    _lockTimeoutSeconds = 15; 
   }
   
   /// Update auto-lock settings
-  void updateSettings({bool? enabled, int? timeoutMinutes}) {
+  void updateSettings({bool? enabled, int? timeoutSeconds}) {
     if (enabled != null) {
       _isEnabled = enabled;
     }
-    if (timeoutMinutes != null) {
-      _lockTimeoutMinutes = timeoutMinutes;
+    if (timeoutSeconds != null) {
+      _lockTimeoutSeconds = timeoutSeconds;
     }
     
     if (_isEnabled) {
@@ -62,13 +55,14 @@ class AutoLockService {
     
     _stopMonitoring(); // Stop any existing timer
     _lastInteraction = DateTime.now();
+    _isLoggedOut = false;
     
-    // Check every 30 seconds if app should be locked
-    _inactivityTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Check every 5 seconds for banking-level precision
+    _inactivityTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _checkInactivity();
     });
     
-    debugPrint('🔒 Auto-lock monitoring started (${_lockTimeoutMinutes}m timeout)');
+    debugPrint('🔒 Session monitoring started (${_lockTimeoutSeconds}s timeout)');
   }
   
   /// Stop monitoring
@@ -77,16 +71,16 @@ class AutoLockService {
     _inactivityTimer = null;
   }
   
-  /// Check if app should be locked due to inactivity
+  /// Check if session should be terminated due to inactivity
   void _checkInactivity() {
-    if (!_isEnabled || _isLocked) return;
+    if (!_isEnabled || _isLoggedOut) return;
     
     final now = DateTime.now();
     final inactiveDuration = now.difference(_lastInteraction);
     
-    if (inactiveDuration.inMinutes >= _lockTimeoutMinutes) {
-      debugPrint('🔒 Auto-locking app after ${inactiveDuration.inMinutes} minutes of inactivity');
-      _lockApp();
+    if (inactiveDuration.inSeconds >= _lockTimeoutSeconds) {
+      debugPrint('🚨 Session expired: Logging out after ${inactiveDuration.inSeconds} seconds of inactivity');
+      _performHardLogout();
     }
   }
   
@@ -95,115 +89,53 @@ class AutoLockService {
     _lastInteraction = DateTime.now();
   }
   
-  /// Lock the app
-  void _lockApp() {
-    if (_isLocked) return;
-    
-    _isLocked = true;
-    _showUnlockScreen();
-  }
-  
-  /// Show unlock screen
-  void _showUnlockScreen() {
-    Get.dialog(
-      WillPopScope(
-        onWillPop: () async => false, // Prevent dismissing with back button
-        child: Material(
-          color: Colors.black87,
-          child: Center(
-            child: Container(
-              margin: const EdgeInsets.all(32),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.lock_outline,
-                    size: 64,
-                    color: Color(0xFF002060),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'App Locked',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF002060),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Authenticate to unlock',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => _authenticate(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF002060),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text(
-                      'Unlock',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-      barrierDismissible: false,
-    );
-  }
-  
-  /// Authenticate user to unlock
-  Future<void> _authenticate() async {
+  /// Perform a hard logout (Banking level security)
+  void _performHardLogout() async {
+    if (_isLoggedOut) return;
+    _isLoggedOut = true;
+    _stopMonitoring();
+
     try {
-      // Check if biometric is available
-      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
-      final isDeviceSupported = await _localAuth.isDeviceSupported();
-      
-      if (canCheckBiometrics && isDeviceSupported) {
-        final authenticated = await _localAuth.authenticate(
-          localizedReason: 'Authenticate to unlock FinEye',
-          options: const AuthenticationOptions(
-            stickyAuth: true,
-            biometricOnly: false,
-          ),
-        );
-        
-        if (authenticated) {
-          _unlockApp();
-        }
+      // 1. Clear session in Auth Service
+      // Ensure AuthService is registered in GetX or use a new instance
+      if (Get.isRegistered<AuthService>()) {
+        await Get.find<AuthService>().signOut();
       } else {
-        // No biometric available, just unlock
-        _unlockApp();
+        await AuthService().signOut();
       }
+      
+      // 2. Force redirect to login screen and clear history
+      Get.offAllNamed('/auth'); 
+
+      // 3. Show "Professional Bullshit" Security Dialog after redirect
+      Get.dialog(
+        AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.security, color: Color(0xFF002060)),
+              SizedBox(width: 10),
+              Text('Security Notice'),
+            ],
+          ),
+          content: const Text(
+            'Your session has expired due to 15 seconds of inactivity. You have been logged out to protect your financial data.',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF002060))),
+            ),
+          ],
+        ),
+        barrierDismissible: false,
+      );
     } catch (e) {
-      debugPrint('❌ Authentication error: $e');
-      // On error, unlock anyway (don't lock user out)
-      _unlockApp();
+      debugPrint('❌ Logout error: $e');
+      // Fallback redirect if anything fails
+      Get.offAllNamed('/auth');
     }
-  }
-  
-  /// Unlock the app
-  void _unlockApp() {
-    _isLocked = false;
-    _lastInteraction = DateTime.now();
-    Get.back(); // Close unlock dialog
-    debugPrint('✅ App unlocked');
   }
   
   /// Dispose resources

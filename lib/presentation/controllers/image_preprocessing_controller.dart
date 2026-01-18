@@ -1198,7 +1198,8 @@ class ImagePreprocessingController extends GetxController {
       // Run OCR processing (optional - continue even if it fails)
       String? rawOcrText;
       dynamic extractedData;
-      
+      Map<String, dynamic>? ocrResult;
+
       try {
         // Initialize OCR controller if not already registered
         if (!Get.isRegistered<OCRController>()) {
@@ -1210,7 +1211,7 @@ class ImagePreprocessingController extends GetxController {
         if (kIsWeb) {
           try {
             print('🔍 OCR (web): Starting OCR processing with bytes (${bytesToSave.length} bytes)...');
-            final ocrResult =
+            ocrResult =
                 await ocrController.processInvoiceImage(imageBytes: bytesToSave);
             if (ocrResult != null) {
               rawOcrText = ocrResult['rawText'] as String?;
@@ -1237,7 +1238,7 @@ class ImagePreprocessingController extends GetxController {
             // Check if file exists before processing
             if (await outputFile.exists()) {
               print('🔍 OCR: Starting OCR processing (mobile)...');
-              final ocrResult =
+              ocrResult =
                   await ocrController.processInvoiceImage(imageFile: outputFile as dynamic);
               if (ocrResult != null) {
                 rawOcrText = ocrResult['rawText'] as String?;
@@ -1285,6 +1286,7 @@ class ImagePreprocessingController extends GetxController {
             'type': fileType.value,
             'rawOcrText': rawOcrText,
             'extractedData': extractedData,
+            'rawDocumentAI': ocrResult?['rawDocumentAI'],
           };
           print('📤 Image Preprocessing: Result map keys (web): ${result.keys}');
           Get.offNamed(AppRoutes.invoiceDetails, arguments: result);
@@ -1315,6 +1317,7 @@ class ImagePreprocessingController extends GetxController {
             'type': fileType.value,
             'rawOcrText': rawOcrText,
             'extractedData': extractedData,
+            'rawDocumentAI': ocrResult?['rawDocumentAI'],
             };
             
             print('📤 Image Preprocessing: Result map keys: ${result.keys}');

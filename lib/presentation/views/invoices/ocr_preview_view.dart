@@ -36,6 +36,8 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
                     const SizedBox(height: 24),
                     _buildAdditionalFieldsSection(),
                     const SizedBox(height: 24),
+                    _buildRawJsonSection(), // NEW: Raw JSON Display
+                    const SizedBox(height: 24),
                     _buildRawOcrTextSection(),
                     const SizedBox(height: 24),
                     _buildAmountsSection(),
@@ -383,6 +385,49 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
         ),
       );
     });
+  }
+
+  Widget _buildRawJsonSection() {
+    return _buildSection(
+      'Raw AI Data', // Hardcoded title as requested "big ass textfield"
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Extracted Data (JSON)',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB), // Light grey bg
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: TextField(
+              controller: controller.rawJsonController,
+              maxLines: null, // Allow infinite growth/scrolling
+              minLines: 10,   // "Big ass textfield"
+              readOnly: true,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: AppColors.ink,
+              ),
+              decoration: const InputDecoration(
+                contentPadding: EdgeInsets.all(16),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
   
   Widget _buildTextField({

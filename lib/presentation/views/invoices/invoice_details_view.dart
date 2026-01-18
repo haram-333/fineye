@@ -1707,4 +1707,55 @@ class InvoiceDetailsView extends GetView<InvoiceDetailsController> {
       ],
     );
   }
+
+  // Debug: Raw Document AI JSON
+  Widget _buildRawDocumentAI() {
+    if (controller.rawDocumentAI == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.code, color: Color(0xFF6B7280)),
+              const SizedBox(width: 8),
+              Text(
+                'Debug: Raw Document AI JSON',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF111827)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFD1D5DB)),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Text(
+                controller.rawDocumentAI.toString(),
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  color: Color(0xFF374151),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -148,6 +148,7 @@ class OCRController extends GetxController {
       return {
         'rawText': extractedText,
         'extractedData': structuredData,
+        'rawDocumentAI': docAIResult?['data']?['rawDocumentAI'],
       };
     } catch (e, stackTrace) {
       isProcessing.value = false;
@@ -261,6 +262,7 @@ class OCRController extends GetxController {
           return {
             'rawText': fullText.trim(),
             'extractedData': structuredData,
+            'rawDocumentAI': result['data']['rawDocumentAI'],
           };
         } else {
           print('⚠️ Document AI: Success but empty text extracted');

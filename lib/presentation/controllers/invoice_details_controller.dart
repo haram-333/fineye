@@ -28,9 +28,12 @@ class InvoiceDetailsController extends GetxController {
   
   /// File containing the invoice image (for new invoices from OCR) - mobile only
   io.File? invoiceImageFile;
-  
+
   /// Image bytes for web platform (for new invoices from OCR)
   Uint8List? invoiceImageBytes;
+
+  /// Raw Document AI JSON response (for debugging)
+  dynamic rawDocumentAI;
   
   /// Flag to indicate if this is a new invoice (from OCR) or editing existing
   bool isNewInvoice = false;

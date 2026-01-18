@@ -10,7 +10,7 @@ class DocumentAIService {
   static const String productionUrl = 'https://fineye-one.vercel.app';
   
   // Your computer's local IP address (for physical device testing)
-  static const String localIp = '192.168.1.3';
+  static const String localIp = '192.168.100.6';
   
   // Get base URL based on environment and platform
   static String get baseUrl {

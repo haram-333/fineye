@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io' if (dart.library.html) 'package:fineye/presentation/controllers/file_stub.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -29,9 +30,11 @@ class OCRPreviewController extends GetxController {
   final RxString rawOcrText = ''.obs;
 
   // Text Controllers
+  // Text Controllers
   final TextEditingController supplierController = TextEditingController();
   final TextEditingController invoiceNumberController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
+  final TextEditingController rawJsonController = TextEditingController();
   
   // Dynamic Fields
   final RxMap<String, String> additionalFields = <String, String>{}.obs;
@@ -61,6 +64,9 @@ class OCRPreviewController extends GetxController {
 
   // Risk flags
   final RxList<InvoiceRisk> risks = <InvoiceRisk>[].obs;
+  
+  // Flag to track if we trusted AI data
+  bool isExtractedDataLoaded = false;
 
   // Categories
   final List<String> categories = [
@@ -116,6 +122,7 @@ class OCRPreviewController extends GetxController {
         if (args['extractedData'] != null) {
           print('✅ OCR Preview: Loading structured extracted data');
           _loadExtractedData(args['extractedData']);
+          isExtractedDataLoaded = true;
         }
         
         // Check if invoice is provided (for editing existing invoice)
@@ -131,10 +138,10 @@ class OCRPreviewController extends GetxController {
       print('⚠️ OCR Preview: No arguments provided - manual entry mode');
     }
 
-    // Always run regex parse on raw text to extract values directly from invoice.
-    // This will override any incorrect values from structured data or calculations.
-    if (rawOcrText.value.isNotEmpty) {
-      print('🔍 OCR Preview: Parsing amounts from raw OCR text...');
+    // Only parse raw text if we DID NOT load structured data
+    // This prevents "rule-based shit" from overwriting valid AI data
+    if (rawOcrText.value.isNotEmpty && !isExtractedDataLoaded) {
+      print('🔍 OCR Preview: Parsing amounts from raw OCR text (Rule-based fallback)...');
       _parseRawTextToFields(rawOcrText.value);
       print('🔍 OCR Preview: After parsing - Net: ${netAmount.value}, VAT: ${vatAmount.value}, Gross: ${grossAmount.value}');
     }
@@ -220,6 +227,7 @@ class OCRPreviewController extends GetxController {
       ];
 
       if (extractedData.rawEntities.isNotEmpty) {
+        // 1. Populate Dynamic Fields
         extractedData.rawEntities.forEach((key, value) {
           // Normalize key to check against handled types
           if (!handledTypes.contains(key) && value != null) {
@@ -229,6 +237,11 @@ class OCRPreviewController extends GetxController {
             print('✅ Loaded additional field: $key = $valStr');
           }
         });
+
+        // 2. Populate Raw JSON View for debugging/verification
+        // Using 2 spaces indentation for readability
+        const JsonEncoder encoder = JsonEncoder.withIndent('  ');
+        rawJsonController.text = encoder.convert(extractedData.rawEntities);
       }
       
       // Auto-calculate if needed

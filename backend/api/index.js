@@ -648,7 +648,6 @@ app.post('/api/password/reset-email', async (req, res) => {
 
 // Invoice OCR endpoint with Google Document AI
 app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
-  try {
     console.log('📥 Document AI: Received invoice upload request');
     
     if (!req.file) {
@@ -751,11 +750,28 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
           }
 
           // ---------------------------------------------------------
-          // NEW: Gemini LLM Extraction Layer
+          // REQUIRED: Gemini LLM Extraction Layer
           // ---------------------------------------------------------
-          // If we have text but no entities (Document OCR), OR if we just want better accuracy,
-          // we send the text to Gemini Flash to get perfect JSON.
-          if (process.env.GEMINI_API_KEY && fullText.length > 10) {
+          // Gemini is now REQUIRED for structured extraction from raw OCR text
+          // It provides consistent, structured JSON regardless of invoice format/variations
+          if (!process.env.GEMINI_API_KEY) {
+            console.error('❌ Gemini API key required but not set');
+            return res.status(500).json({
+              success: false,
+              message: 'Gemini API key not configured for invoice extraction'
+            });
+          }
+
+          if (fullText.length <= 10) {
+            console.error('❌ Not enough OCR text for Gemini processing');
+            return res.status(400).json({
+              success: false,
+              message: 'Insufficient text extracted from invoice'
+            });
+          }
+
+          // Gemini is required, so we always try it
+          try {
             try {
               console.log('✨ Gemini: Starting intelligent extraction...');
               const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -821,71 +837,16 @@ app.post('/api/ocr/document-ai', upload.single('invoice'), async (req, res) => {
               }
             } catch (geminiError) {
               console.error('❌ Gemini Extraction Failed:', geminiError);
-              console.log('⚠️ Falling back to raw Document AI output');
-              // Fallthrough to return original Document AI result if Gemini fails
+              return res.status(500).json({
+                success: false,
+                message: 'Failed to extract invoice data with Gemini',
+                error: geminiError.message
+              });
             }
           }
           // ---------------------------------------------------------
-          
-    let extractedData;
-    
-    // Check if we have structured entities (Invoice Parser)
-    if (entities && entities.length > 0) {
-      extractedData = {
-        fullText: fullText,
-        entities: entities,
-        detectedLanguages: detectedLanguages,
-        source: 'document_ai',
-        supplierName: entities.find(e => e.type === 'supplier_name')
-          ? getTextFromAnchor(entities.find(e => e.type === 'supplier_name').textAnchor, fullText)
-          : null,
-        invoiceDate: entities.find(e => e.type === 'invoice_date')
-          ? getTextFromAnchor(entities.find(e => e.type === 'invoice_date').textAnchor, fullText)
-          : null,
-        dueDate: entities.find(e => e.type === 'due_date')
-          ? getTextFromAnchor(entities.find(e => e.type === 'due_date').textAnchor, fullText)
-          : null,
-        totalAmount: entities.find(e => e.type === 'total_amount' || e.type === 'total')
-          ? getTextFromAnchor(entities.find(e => e.type === 'total_amount' || e.type === 'total').textAnchor, fullText)
-          : null,
-        netAmount: entities.find(e => e.type === 'net_amount' || e.type === 'net')
-          ? getTextFromAnchor(entities.find(e => e.type === 'net_amount' || e.type === 'net').textAnchor, fullText)
-          : null,
-        taxAmount: entities.find(e => e.type === 'tax_amount' || e.type === 'vat_amount')
-          ? getTextFromAnchor(entities.find(e => e.type === 'tax_amount' || e.type === 'vat_amount').textAnchor, fullText)
-          : null,
-        currency: entities.find(e => e.type === 'currency')
-          ? getTextFromAnchor(entities.find(e => e.type === 'currency').textAnchor, fullText)
-          : null,
-      };
-    } else {
-      // Document OCR format - raw text only
-      extractedData = {
-        fullText: fullText,
-        entities: [], // No structured entities from Document OCR
-        detectedLanguages: detectedLanguages,
-        source: 'document_ai_ocr'
-        // Fields will be parsed client-side using regex
-      };
-      console.log(`📄 Document OCR: Extracted ${fullText.length} characters of text`);
-    }
 
-    console.log('✅ Document AI: Successfully extracted invoice data');
-    
-    res.json({ 
-      success: true, 
-      data: extractedData,
-      rawDocumentAI: docAIResult // Include full response for debugging/advanced use
-    });
-  } catch (error) {
-    console.error('❌ Document AI error:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to process invoice with Document AI',
-      error: error.message || error.toString() 
-    });
-  }
+          // Gemini is mandatory - no fallback to Document AI entities
 });
 
 // Reset password endpoint (requires OTP verification first)

@@ -71,8 +71,8 @@ class SecurityController extends GetxController {
   Future<void> toggleBiometric(bool value) async {
     if (value && !isBiometricAvailable.value) {
       SnackbarService.to.showError(
-        'Biometric Unavailable',
-        'Biometric authentication is not available on this device.',
+        'title_biometric_unavailable'.tr,
+        'msg_biometric_not_available'.tr,
       );
       return;
     }
@@ -98,8 +98,8 @@ class SecurityController extends GetxController {
         }
       } on PlatformException catch (e) {
         SnackbarService.to.showError(
-          'Authentication Failed',
-          e.message ?? 'Failed to authenticate. Please try again.',
+          'title_auth_failed'.tr,
+          e.message ?? 'msg_auth_failed_retry'.tr,
         );
       }
     } else {
@@ -116,14 +116,14 @@ class SecurityController extends GetxController {
     if (value) {
       await ScreenPrivacyService.enable();
       SnackbarService.to.showSuccess(
-        'Screen Privacy Enabled',
-        'App content will be hidden in the app switcher and screenshots are disabled.',
+        'title_screen_privacy_enabled'.tr,
+        'msg_screen_privacy_enabled'.tr,
       );
     } else {
       await ScreenPrivacyService.disable();
       SnackbarService.to.showInfo(
-        'Screen Privacy Disabled',
-        'App content will be visible in the app switcher.',
+        'title_screen_privacy_disabled'.tr,
+        'msg_screen_privacy_disabled'.tr,
       );
     }
   }
@@ -138,8 +138,8 @@ class SecurityController extends GetxController {
       );
       AutoLockService.instance.updateSettings(enabled: false);
       SnackbarService.to.showInfo(
-        'Auto-lock Disabled',
-        'App will no longer auto-lock automatically.',
+        'title_auto_lock_disabled'.tr,
+        'msg_auto_lock_disabled'.tr,
       );
     } else {
       final effectiveTime = autoLockTime.value == 'off' ? '3m' : autoLockTime.value;
@@ -154,8 +154,8 @@ class SecurityController extends GetxController {
         timeoutSeconds: timeoutSeconds,
       );
       SnackbarService.to.showInfo(
-        'Auto-lock Enabled',
-        'App will auto-lock after $effectiveTime of inactivity.',
+        'title_auto_lock_enabled'.tr,
+        'msg_auto_lock_enabled'.trParams({'time': effectiveTime}),
       );
     }
   }
@@ -176,8 +176,8 @@ class SecurityController extends GetxController {
     AutoLockService.instance.updateSettings(timeoutSeconds: timeoutSeconds);
     
     SnackbarService.to.showInfo(
-      'Auto-lock Updated',
-      'App will auto-lock after $time of inactivity.',
+      'title_auto_lock_updated'.tr,
+      'msg_auto_lock_updated'.trParams({'time': time}),
     );
   }
 
@@ -204,10 +204,10 @@ class SecurityController extends GetxController {
 
   void signOutAllDevices() {
     Get.defaultDialog(
-      title: 'Sign out from all devices?',
-      middleText: 'This will sign you out from all logged-in devices except this one.',
-      textConfirm: 'Sign out',
-      textCancel: 'Cancel',
+      title: 'dialog_sign_out_all_title'.tr,
+      middleText: 'dialog_sign_out_all_message'.tr,
+      textConfirm: 'btn_sign_out'.tr,
+      textCancel: 'btn_cancel'.tr,
       confirmTextColor: Get.theme.colorScheme.onError,
       buttonColor: Get.theme.colorScheme.error,
       onConfirm: () {

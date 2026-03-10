@@ -1,8 +1,10 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import '../../controllers/invoice_edit_controller.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/format_helper.dart';
 
 class InvoiceEditView extends GetView<InvoiceEditController> {
   const InvoiceEditView({super.key});
@@ -19,8 +21,8 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: const BackButton(color: AppColors.ink),
-        title: const Text(
-          'Edit Invoice',
+        title: Text(
+          'edit_invoice'.tr,
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -35,12 +37,14 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildImagePreview(controller),
+              const SizedBox(height: 20),
               // Invoice Number & Date
               Row(
                 children: [
                   Expanded(
                     child: _buildTextField(
-                      label: 'Invoice Number',
+                      label: 'invoice_number'.tr,
                       controller: controller.invoiceNumberController,
                       required: true,
                     ),
@@ -48,7 +52,7 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildDateField(
-                      label: 'Invoice Date',
+                      label: 'invoice_date'.tr,
                       date: controller.invoiceDate,
                       onTap: controller.selectDate,
                       required: true,
@@ -60,7 +64,7 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
               
               // Supplier
               _buildTextField(
-                label: 'Supplier Name',
+                label: 'supplier_name'.tr,
                 controller: controller.supplierController,
                 required: true,
               ),
@@ -72,7 +76,7 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
               
               // Net Amount
               _buildAmountField(
-                label: 'Net Amount',
+                label: 'net_amount'.tr,
                 controller: controller.netAmountController,
                 required: true,
                 onChanged: () => controller.update(),
@@ -81,14 +85,14 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
               
               // VAT Amount (calculated, read-only)
               _buildReadOnlyAmountField(
-                label: 'VAT Amount (5%)',
+                label: '${"vat_amount".tr} (5%)',
                 value: controller.vatAmount,
               ),
               const SizedBox(height: 16),
               
               // Additional Charges
               _buildAmountField(
-                label: 'Additional Charges',
+                label: 'additional_charges'.tr,
                 controller: controller.additionalChargesController,
                 onChanged: () => controller.update(),
               ),
@@ -96,14 +100,14 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
               
               // Gross Amount (calculated, read-only)
               _buildReadOnlyAmountField(
-                label: 'Gross Amount',
+                label: 'gross_amount'.tr,
                 value: controller.grossAmount,
               ),
               const SizedBox(height: 16),
               
               // Final Total (calculated, read-only)
               _buildReadOnlyAmountField(
-                label: 'Final Total',
+                label: 'final_total'.tr,
                 value: controller.finalTotal,
                 isTotal: true,
               ),
@@ -119,7 +123,7 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
               
               // Notes
               _buildTextField(
-                label: 'Notes',
+                label: 'notes_section'.tr,
                 controller: controller.notesController,
                 maxLines: 3,
               ),
@@ -137,9 +141,9 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Save Changes',
-                    style: TextStyle(
+                  child: Text(
+                    'save_changes'.tr,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -151,6 +155,148 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildImagePreview(InvoiceEditController controller) {
+    final imageUrl = controller.invoice.imageUrl;
+    // For demo/debugging if imageUrl is null but it's a known invoice
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'invoice_preview'.tr, // Correctly localized
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.ink,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => _showFullScreenImage(imageUrl),
+              icon: const Icon(Icons.fullscreen, size: 20, color: AppColors.primaryBlue),
+              label: Text(
+                'full_details'.tr,
+                style: const TextStyle(color: AppColors.primaryBlue),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _showFullScreenImage(imageUrl),
+          child: Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+              color: Colors.white,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                Center(
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    width: double.infinity,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40),
+                            const SizedBox(height: 8),
+                            Text('error_loading_image'.tr, style: const TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.zoom_in, color: Colors.white, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          'tap_to_enlarge'.tr,
+                          style: const TextStyle(color: Colors.white, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Get.back(),
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.9),
+                width: double.infinity,
+                height: double.infinity,
+              ),
+            ),
+            InteractiveViewer(
+              maxScale: 5.0,
+              child: Image.network(
+                imageUrl,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator(color: Colors.white));
+                },
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: CircleAvatar(
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Get.back(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      useSafeArea: false,
     );
   }
   
@@ -250,11 +396,14 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  date != null ? DateFormat('dd MMM yyyy').format(date) : 'Select date',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: date != null ? AppColors.ink : Colors.grey,
+                Directionality(
+                  textDirection: ui.TextDirection.ltr,
+                  child: Text(
+                    date != null ? FormatHelper.date(date) : 'select_date'.tr,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: date != null ? AppColors.ink : Colors.grey,
+                    ),
                   ),
                 ),
                 const Icon(Icons.calendar_today, size: 18, color: Color(0xFF9CA3AF)),
@@ -270,9 +419,9 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Category',
-          style: TextStyle(
+        Text(
+          'category'.tr,
+          style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Color(0xFF6B7280),
@@ -290,11 +439,11 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
             value: controller.selectedCategory.isEmpty ? null : controller.selectedCategory,
             isExpanded: true,
             underline: const SizedBox(),
-            hint: const Text('Select category', style: TextStyle(color: Colors.grey)),
+            hint: Text('select_category'.tr, style: const TextStyle(color: Colors.grey)),
             items: controller.categories.map((cat) {
               return DropdownMenuItem(
                 value: cat,
-                child: Text(cat),
+                child: Text(controller.getLocalizedCategory(cat)),
               );
             }).toList(),
             onChanged: (value) {
@@ -385,7 +534,7 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
         const SizedBox(height: 6),
         TextField(
           controller: TextEditingController(
-            text: NumberFormat("#,##0.00").format(value),
+            text: FormatHelper.amount(value),
           ),
           readOnly: true,
           style: TextStyle(
@@ -393,6 +542,8 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
             fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
             color: AppColors.ink,
           ),
+          textAlign: TextAlign.start,
+          textDirection: ui.TextDirection.ltr,
           decoration: InputDecoration(
             prefixText: 'AED ',
             prefixStyle: TextStyle(
@@ -428,9 +579,9 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Payment Status',
-            style: TextStyle(
+          Text(
+            'payment_status'.tr,
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
               color: AppColors.ink,
@@ -440,14 +591,14 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
           Row(
             children: [
               _buildPaymentRadio(
-                label: 'Paid',
+                label: 'paid'.tr,
                 value: true,
                 selected: controller.isPaid,
                 onTap: () => controller.setPaymentStatus(true),
               ),
               const SizedBox(width: 24),
               _buildPaymentRadio(
-                label: 'Not Paid',
+                label: 'not_paid'.tr,
                 value: false,
                 selected: !controller.isPaid,
                 onTap: () => controller.setPaymentStatus(false),
@@ -458,9 +609,9 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text(
-                  'Due Date',
-                  style: TextStyle(
+                Text(
+                  'due_date'.tr,
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: Color(0xFF6B7280),
@@ -491,15 +642,18 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      controller.dueDate != null
-                          ? DateFormat('dd MMM yyyy').format(controller.dueDate!)
-                          : 'Select due date',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: controller.dueDate != null 
-                            ? AppColors.ink 
-                            : Colors.grey,
+                    Directionality(
+                      textDirection: ui.TextDirection.ltr,
+                      child: Text(
+                        controller.dueDate != null
+                            ? FormatHelper.date(controller.dueDate!)
+                            : 'select_due_date'.tr,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: controller.dueDate != null 
+                              ? AppColors.ink 
+                              : Colors.grey,
+                        ),
                       ),
                     ),
                     const Icon(Icons.calendar_today, size: 18, color: Color(0xFF9CA3AF)),
@@ -509,9 +663,9 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
             ),
             if (controller.dueDate == null) ...[
               const SizedBox(height: 4),
-              const Text(
-                'Due date is required for unpaid invoices',
-                style: TextStyle(
+              Text(
+                'due_date_required'.tr,
+                style: const TextStyle(
                   fontSize: 12,
                   color: Colors.red,
                 ),
@@ -563,9 +717,9 @@ class InvoiceEditView extends GetView<InvoiceEditController> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'CT Deductible',
-            style: TextStyle(
+          Text(
+            'ct_deductible_section'.tr,
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 16,
               color: AppColors.ink,

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FinEye Admin Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header card">
+        <div>
+          <p class="eyebrow">FinEye Control Center</p>
+          <h1>Admin Dashboard</h1>
+          <p>Post-launch monitoring for users, invoices, and activity.</p>
+        </div>
+        <div class="pill">Browser Only</div>
+      </header>
+
+      <section id="boot-loader" class="card boot-loader">
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Checking session...</span>
+      </section>
+
+      <section id="auth-card" class="card hidden">
+        <div class="auth-inner">
+          <h2>Admin Sign In</h2>
+          <p class="muted">Use your separate admin email account.</p>
+          <form id="login-form">
+            <label for="email">Email</label>
+            <input id="email" type="email" required />
+
+            <label for="password">Password</label>
+            <input id="password" type="password" required />
+
+            <button type="submit">Sign In</button>
+          </form>
+          <p id="auth-error" class="error hidden"></p>
+        </div>
+      </section>
+
+      <section id="dashboard" class="hidden">
+        <div class="toolbar">
+          <div>
+            <h2>Overview</h2>
+            <p id="signed-in-as" class="muted"></p>
+          </div>
+          <div class="actions">
+            <input id="user-search" type="search" placeholder="Search user/company/email" />
+            <button id="refresh-btn">Refresh</button>
+            <button id="logout-btn" class="danger">Logout</button>
+          </div>
+        </div>
+        <div id="loading-row" class="loading-row hidden">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>Loading dashboard data...</span>
+        </div>
+        <p id="dashboard-error" class="error hidden"></p>
+        <p id="active-filter" class="muted">Filter: All users</p>
+
+        <div class="grid">
+          <button class="metric active" data-metric="all" type="button"><h3>Registered Users</h3><p id="m-users">-</p></button>
+          <button class="metric" data-metric="active_today" type="button"><h3>Active Today</h3><p id="m-active-today">-</p></button>
+          <button class="metric" data-metric="active_7d" type="button"><h3>Active 7 Days</h3><p id="m-active-week">-</p></button>
+          <button class="metric" data-metric="has_invoices" type="button"><h3>Total Invoices</h3><p id="m-invoices">-</p></button>
+          <button class="metric" data-metric="has_app_opens" type="button"><h3>Total App Opens</h3><p id="m-opens">-</p></button>
+          <button class="metric" data-metric="has_views" type="button"><h3>Total Screen Views</h3><p id="m-views">-</p></button>
+        </div>
+
+        <section class="card table-card">
+          <h3>User Activity</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Actions</th>
+                  <th>Company</th>
+                  <th>Email</th>
+                  <th>User ID</th>
+                  <th>Registered</th>
+                  <th>Invoices</th>
+                  <th>Last Active</th>
+                  <th>Last Route</th>
+                  <th>App Opens</th>
+                  <th>Views</th>
+                </tr>
+              </thead>
+              <tbody id="user-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="invoice-panel" class="card table-card hidden">
+          <div class="toolbar">
+            <div>
+              <h3 id="invoice-panel-title">User Invoices</h3>
+              <p id="invoice-panel-subtitle" class="muted"></p>
+            </div>
+            <button id="close-invoice-panel" type="button">Close</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Party</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Date</th>
+                  <th>Net</th>
+                  <th>VAT</th>
+                  <th>Gross</th>
+                  <th>Status</th>
+                  <th>Image</th>
+                </tr>
+              </thead>
+              <tbody id="invoice-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+  </html>

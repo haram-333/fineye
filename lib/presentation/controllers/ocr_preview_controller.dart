@@ -646,38 +646,38 @@ class OCRPreviewController extends GetxController {
   void showReviewSummary() {
     Get.dialog(
       AlertDialog(
-        title: const Text('Review Invoice'),
+        title: Text('review_invoice_title'.tr),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _summaryRow('Supplier', supplierController.text),
-              _summaryRow('Invoice #', invoiceNumberController.text),
-              _summaryRow('Date', invoiceDate.value.toString().split(' ')[0]),
-              _summaryRow('Category', selectedCategory.value),
+              _summaryRow('supplier'.tr, supplierController.text),
+              _summaryRow('invoice_number_short'.tr, invoiceNumberController.text),
+              _summaryRow('invoice_date'.tr, invoiceDate.value.toString().split(' ')[0]),
+              _summaryRow('category'.tr, selectedCategory.value),
               const Divider(),
-              _summaryRow('Net Amount', 'AED ${netAmount.value.toStringAsFixed(2)}'),
-              _summaryRow('VAT Amount', 'AED ${vatAmount.value.toStringAsFixed(2)}'),
-              _summaryRow('Gross Amount', 'AED ${grossAmount.value.toStringAsFixed(2)}'),
+              _summaryRow('net_amount'.tr, 'AED ${netAmount.value.toStringAsFixed(2)}'),
+              _summaryRow('vat_amount'.tr, 'AED ${vatAmount.value.toStringAsFixed(2)}'),
+              _summaryRow('gross_amount'.tr, 'AED ${grossAmount.value.toStringAsFixed(2)}'),
               const Divider(),
-              _summaryRow('VAT Type', isVatInclusive.value ? 'Inclusive' : 'Exclusive'),
-              _summaryRow('Invoice Type', isPurchase.value ? 'Purchase' : 'Sales'),
-              _summaryRow('CT Deductible', isCtDeductible.value ? 'Yes' : 'No'),
+              _summaryRow('vat_type_label'.tr, isVatInclusive.value ? 'vat_inclusive_option'.tr : 'vat_exclusive_option'.tr),
+              _summaryRow('invoice_type_label'.tr, isPurchase.value ? 'purchase_input_vat'.tr : 'sales_output_vat'.tr),
+              _summaryRow('ct_deductible_label'.tr, isCtDeductible.value ? 'lbl_yes'.tr : 'lbl_no'.tr),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: const Text('Back'),
+            child: Text('btn_back'.tr),
           ),
           ElevatedButton(
             onPressed: () {
               Get.back();
               saveInvoice();
             },
-            child: const Text('Confirm & Save'),
+            child: Text('btn_confirm_save'.tr),
           ),
         ],
       ),
@@ -700,8 +700,8 @@ class OCRPreviewController extends GetxController {
   Future<void> saveInvoice() async {
     // This method is no longer used - InvoiceDetailsController handles saving
     SnackbarService.to.showInfo(
-      'Info',
-      'Please use the save button on the invoice details screen.',
+      'title_info'.tr,
+      'msg_use_save_button'.tr,
     );
     return;
   }
@@ -857,9 +857,10 @@ class OCRPreviewController extends GetxController {
         // Don't fail the save if notification fails
       }
 
+      // Show success
       SnackbarService.to.showSuccess(
-        'invoice_saved'.tr,
-        'invoice_saved_successfully'.tr,
+        'ocr_success_title'.tr,
+        'ocr_success_message'.trParams({'count': extractedCount.toString()}),
       );
 
       // 5) Navigate directly to full Invoice Details screen for this invoice.

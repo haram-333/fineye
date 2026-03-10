@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "fineye-app": {
+      "hosting": {
+        "admin": [
+          "fineye-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

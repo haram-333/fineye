@@ -50,12 +50,16 @@ class OtpApiService {
         requestBody['purpose'] = purpose;
       }
       
+      debugPrint('📨 sendOtp -> POST $baseUrl/api/otp/send');
+      debugPrint('📨 sendOtp -> body=$requestBody');
       final response = await http.post(
         Uri.parse('$baseUrl/api/otp/send'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
       );
 
+      debugPrint('📨 sendOtp -> status=${response.statusCode}');
+      debugPrint('📨 sendOtp -> body=${response.body}');
       final data = jsonDecode(response.body);
       
       if (response.statusCode == 200 && data['success'] == true) {
@@ -71,6 +75,7 @@ class OtpApiService {
         };
       }
     } catch (e) {
+      debugPrint('📨 sendOtp -> exception=$e');
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -84,6 +89,8 @@ class OtpApiService {
       // Normalize email to lowercase for consistent storage/retrieval
       final normalizedEmail = email.trim().toLowerCase();
       
+      debugPrint('✅ verifyOtp -> POST $baseUrl/api/otp/verify');
+      debugPrint('✅ verifyOtp -> email=$normalizedEmail otp=$otp');
       final response = await http.post(
         Uri.parse('$baseUrl/api/otp/verify'),
         headers: {'Content-Type': 'application/json'},
@@ -93,6 +100,8 @@ class OtpApiService {
         }),
       );
 
+      debugPrint('✅ verifyOtp -> status=${response.statusCode}');
+      debugPrint('✅ verifyOtp -> body=${response.body}');
       final data = jsonDecode(response.body);
       
       // Check if response is successful

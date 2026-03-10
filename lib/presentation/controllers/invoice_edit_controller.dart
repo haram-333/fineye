@@ -134,32 +134,47 @@ class InvoiceEditController extends GetxController {
     update();
   }
   
+  String getLocalizedCategory(String cat) {
+    switch (cat) {
+      case 'Office supplies': return 'cat_office_supplies'.tr;
+      case 'Utilities': return 'cat_utilities'.tr;
+      case 'Transport': return 'cat_transport'.tr;
+      case 'Subscriptions': return 'cat_subscriptions'.tr;
+      case 'Marketing': return 'cat_marketing'.tr;
+      case 'Professional fees': return 'cat_professional_fees'.tr;
+      case 'Rent': return 'cat_rent'.tr;
+      case 'Maintenance': return 'cat_maintenance'.tr;
+      case 'Other': return 'cat_other'.tr;
+      default: return cat;
+    }
+  }
+  
   Future<void> saveInvoice() async {
     // Validate required fields
     if (supplierController.text.trim().isEmpty) {
-      SnackbarService.to.showError('Error', 'Supplier name is required');
+      SnackbarService.to.showError('error'.tr, 'supplier_required'.tr);
       return;
     }
     
     if (invoiceNumberController.text.trim().isEmpty) {
-      SnackbarService.to.showError('Error', 'Invoice number is required');
+      SnackbarService.to.showError('error'.tr, 'invoice_number_required'.tr);
       return;
     }
     
     if (invoiceDate == null) {
-      SnackbarService.to.showError('Error', 'Invoice date is required');
+      SnackbarService.to.showError('error'.tr, 'invoice_date_required'.tr);
       return;
     }
     
     final net = _parseAmount(netAmountController.text);
     if (net <= 0) {
-      SnackbarService.to.showError('Error', 'Net amount must be greater than 0');
+      SnackbarService.to.showError('error'.tr, 'net_amount_gt_zero'.tr);
       return;
     }
     
     // Validate due date if unpaid
     if (!isPaid && dueDate == null) {
-      SnackbarService.to.showError('Error', 'Due date is required for unpaid invoices');
+      SnackbarService.to.showError('error'.tr, 'due_date_required'.tr);
       return;
     }
     
@@ -167,7 +182,7 @@ class InvoiceEditController extends GetxController {
       // Get current user
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
-        SnackbarService.to.showError('Error', 'You must be logged in');
+        SnackbarService.to.showError('error'.tr, 'must_login'.tr);
         return;
       }
       
@@ -249,12 +264,12 @@ class InvoiceEditController extends GetxController {
             debugPrint('✅ Found document ID: $docId');
           } else {
             debugPrint('❌ No document found with invoice ID: ${invoice.id}');
-            SnackbarService.to.showError('Error', 'Invoice not found in database');
+            SnackbarService.to.showError('error'.tr, 'invoice_not_found'.tr);
             return;
           }
         } catch (e) {
           debugPrint('❌ Error finding document: $e');
-          SnackbarService.to.showError('Error', 'Failed to find invoice: ${e.toString()}');
+          SnackbarService.to.showError('error'.tr, 'failed_to_find_invoice'.trParams({'error': e.toString()}));
           return;
         }
       }
@@ -264,11 +279,11 @@ class InvoiceEditController extends GetxController {
       debugPrint('   Supplier: ${updatedInvoice.supplierName}');
       debugPrint('   Amount: ${updatedInvoice.grossAmount}');
       
-      final success = await _invoiceRepository.updateInvoiceByDocId(docId, updatedInvoice);
+      final success = await _invoiceRepository.updateInvoiceByDocId(docId!, updatedInvoice);
       
       if (success) {
         debugPrint('✅ Invoice updated successfully!');
-        SnackbarService.to.showSuccess('Success', 'Invoice updated successfully');
+        SnackbarService.to.showSuccess('success'.tr, 'invoice_updated_success'.tr);
         
         // Refresh invoice list and dashboard
         if (Get.isRegistered<InvoiceListController>()) {
@@ -283,10 +298,10 @@ class InvoiceEditController extends GetxController {
         Get.back();
       } else {
         debugPrint('❌ Failed to update invoice');
-        SnackbarService.to.showError('Error', 'Failed to update invoice. Please try again.');
+        SnackbarService.to.showError('error'.tr, 'failed_to_update_invoice'.tr);
       }
     } catch (e) {
-      SnackbarService.to.showError('Error', 'Failed to save: ${e.toString()}');
+      SnackbarService.to.showError('error'.tr, 'failed_to_save'.trParams({'error': e.toString()}));
     }
   }
   

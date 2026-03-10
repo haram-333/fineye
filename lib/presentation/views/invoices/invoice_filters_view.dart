@@ -1,7 +1,8 @@
-
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:fineye/core/utils/format_helper.dart';
 import 'package:fineye/presentation/controllers/invoice_filters_controller.dart';
 import 'package:fineye/presentation/controllers/invoice_list_controller.dart';
 import 'package:fineye/core/constants/app_colors.dart';
@@ -187,7 +188,7 @@ class InvoiceFiltersView extends GetView<InvoiceFiltersController> {
   Widget _buildDatePicker(BuildContext context, {required bool isStartDate}) {
     return Obx(() {
       final date = isStartDate ? controller.startDate.value : controller.endDate.value;
-      final text = date != null ? DateFormat('dd MMM yyyy').format(date) : 'select_date'.tr;
+      final text = date != null ? FormatHelper.date(date) : 'select_date'.tr;
       
       return InkWell(
         onTap: () async {
@@ -197,6 +198,7 @@ class InvoiceFiltersView extends GetView<InvoiceFiltersController> {
             firstDate: DateTime(2020),
             lastDate: DateTime(2030),
           );
+          
           if (picked != null) {
             if (isStartDate) {
               controller.onDateSelected(picked, controller.endDate.value);
@@ -214,11 +216,14 @@ class InvoiceFiltersView extends GetView<InvoiceFiltersController> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                text,
-                style: TextStyle(
-                  color: date != null ? Colors.black : Colors.grey,
-                  fontWeight: FontWeight.w500,
+              Directionality(
+                textDirection: ui.TextDirection.ltr,
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: date != null ? Colors.black : Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               Icon(Icons.calendar_today_outlined, size: 16, color: Colors.grey.shade600),
@@ -228,6 +233,7 @@ class InvoiceFiltersView extends GetView<InvoiceFiltersController> {
       );
     });
   }
+
 
   Widget _buildQuickDateBtn(String key, VoidCallback onTap) {
     return Obx(() {

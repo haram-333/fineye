@@ -11,17 +11,34 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+
+    // Helper function to check if user has admin custom claim
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          request.auth.token.admin == true ||
+          request.auth.token.email == "admin@fineye.com"
+        );
+    }
     
     // User invoices - users can only access their own invoices
     match /user_invoices/{invoiceId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
     
     // User profiles - users can read/write their own profile
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && userId == request.auth.uid;
+      allow read: if isAdmin() || (isAuthenticated() && userId == request.auth.uid);
+      allow write: if isAuthenticated() && userId == request.auth.uid;
+    }
+
+    // Per-user activity tracking used for admin monitoring
+    match /user_activity/{userId} {
+      allow read: if isAdmin() || (isAuthenticated() && userId == request.auth.uid);
+      allow create, update: if isAuthenticated() && userId == request.auth.uid;
+      allow delete: if isAdmin();
     }
     
     // User notification settings - users can manage their own settings

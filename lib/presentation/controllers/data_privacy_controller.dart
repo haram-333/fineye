@@ -9,8 +9,8 @@ class DataPrivacyController extends GetxController {
     try {
       // Show loading
       SnackbarService.to.showInfo(
-        'Exporting Data',
-        'Preparing your data export...',
+        'title_exporting_data'.tr,
+        'msg_preparing_data_export'.tr,
       );
       
       // In production, this would:
@@ -48,8 +48,8 @@ class DataPrivacyController extends GetxController {
       );
     } catch (e) {
       SnackbarService.to.showError(
-        'Clear Cache Failed',
-        'Failed to clear cache: ${e.toString()}',
+        'title_clear_cache_failed'.tr,
+        'msg_clear_cache_error'.tr,
       );
     }
   }
@@ -84,8 +84,8 @@ class DataPrivacyController extends GetxController {
         // 4. Navigate to auth screen
         
         SnackbarService.to.showInfo(
-          'Account Deletion',
-          'Your account deletion request has been submitted. This may take a few days to process.',
+          'title_account_deletion'.tr,
+          'msg_account_deletion_submitted'.tr,
         );
         
         // Navigate to auth after a delay
@@ -93,8 +93,8 @@ class DataPrivacyController extends GetxController {
         Get.offAllNamed('/auth');
       } catch (e) {
         SnackbarService.to.showError(
-          'Deletion Failed',
-          'Failed to delete account: ${e.toString()}',
+          'title_deletion_failed'.tr,
+          'msg_delete_account_error'.tr,
         );
       }
     }

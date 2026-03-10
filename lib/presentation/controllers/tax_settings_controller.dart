@@ -191,7 +191,7 @@ class TaxSettingsController extends GetxController {
   Map<String, dynamic> get vatStatus {
     final days = nextVatFilingDate.difference(DateTime.now()).inDays;
     if (days < 0) {
-      return {'text': 'Overdue', 'color': const Color(0xFFE74C3C), 'bg': const Color(0xFFFADBD8)};
+      return {'text': 'status_overdue'.tr, 'color': const Color(0xFFE74C3C), 'bg': const Color(0xFFFADBD8)};
     } else if (days <= 14) {
       return {'text': 'status_due_soon'.tr, 'color': const Color(0xFFfbc02d), 'bg': const Color(0xFFffecb3)};
     } else {
@@ -203,7 +203,7 @@ class TaxSettingsController extends GetxController {
   Map<String, dynamic> get ctStatus {
     final days = nextCtPaymentDate.difference(DateTime.now()).inDays;
     if (days < 0) {
-      return {'text': 'Overdue', 'color': const Color(0xFFE74C3C), 'bg': const Color(0xFFFADBD8)};
+      return {'text': 'status_overdue'.tr, 'color': const Color(0xFFE74C3C), 'bg': const Color(0xFFFADBD8)};
     } else if (days <= 30) {
        return {'text': 'status_due_soon'.tr, 'color': const Color(0xFFfbc02d), 'bg': const Color(0xFFffecb3)};
     } else {
@@ -213,15 +213,15 @@ class TaxSettingsController extends GetxController {
 
   String get vatDueText {
      final days = nextVatFilingDate.difference(DateTime.now()).inDays;
-     if (days < 0) return 'Overdue by ${days.abs()} days';
-     if (days == 0) return 'Due today';
-     return 'Due in $days days';
+     if (days < 0) return 'status_overdue_by_days'.trParams({'days': days.abs().toString()});
+     if (days == 0) return 'status_due_today'.tr;
+     return 'status_due_in_days'.trParams({'days': days.toString()});
   }
 
   String get ctDueText {
      // CT might be "Planned" if far away
       final days = nextCtPaymentDate.difference(DateTime.now()).inDays;
-      if (days > 60) return 'Status: Planned';
+      if (days > 60) return 'status_planned'.tr;
       return vatDueText.replaceFirst('Due', 'Due'); // Just reusing logic, essentially "Due in X days"
   }
 
@@ -230,7 +230,7 @@ class TaxSettingsController extends GetxController {
     if (user == null) {
       SnackbarService.to.showError(
         'title_error'.tr,
-        'You must be logged in to save settings.',
+        'msg_must_login_save'.tr,
       );
       return;
     }
@@ -288,7 +288,7 @@ class TaxSettingsController extends GetxController {
     } catch (e) {
       SnackbarService.to.showError(
         'title_error'.tr,
-        'Failed to save settings: ${e.toString()}',
+        'msg_failed_save_settings'.tr,
       );
     }
   }
@@ -298,7 +298,7 @@ class TaxSettingsController extends GetxController {
     if (user == null) {
       SnackbarService.to.showError(
         'title_error'.tr,
-        'You must be logged in to reset settings.',
+        'msg_must_login_reset'.tr,
       );
       return;
     }

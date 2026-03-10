@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
@@ -60,7 +61,7 @@ class _OtpInputRowState extends State<OtpInputRow> {
     
     // Force LTR direction for OTP input regardless of app language
     return Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
       child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(6, (index) {
@@ -81,7 +82,7 @@ class _OtpInputRowState extends State<OtpInputRow> {
               focusNode: _focusNodes[index],
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-                textDirection: TextDirection.ltr, // Force LTR for text input
+                textDirection: ui.TextDirection.ltr, // Force LTR for text input
               maxLength: 1,
               style: TextStyle(
                 fontSize: fontSize, 

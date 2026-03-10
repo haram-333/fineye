@@ -5,10 +5,33 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../controllers/settings_controller.dart';
 
-class CompanyProfile extends StatelessWidget { const CompanyProfile({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Company Profile'))); }
-class TaxSettings extends StatelessWidget { const TaxSettings({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Tax Settings'))); }
-class DataPrivacy extends StatelessWidget { const DataPrivacy({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Data & Privacy'))); }
-class HelpSupport extends StatelessWidget { const HelpSupport({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Help & Support'))); }
+class CompanyProfile extends StatelessWidget {
+  const CompanyProfile({super.key});
+  @override
+  Widget build(BuildContext context) =>
+      Scaffold(appBar: AppBar(title: Text('profile_info'.tr)));
+}
+
+class TaxSettings extends StatelessWidget {
+  const TaxSettings({super.key});
+  @override
+  Widget build(BuildContext context) =>
+      Scaffold(appBar: AppBar(title: Text('tax_settings'.tr)));
+}
+
+class DataPrivacy extends StatelessWidget {
+  const DataPrivacy({super.key});
+  @override
+  Widget build(BuildContext context) =>
+      Scaffold(appBar: AppBar(title: Text('privacy_title'.tr)));
+}
+
+class HelpSupport extends StatelessWidget {
+  const HelpSupport({super.key});
+  @override
+  Widget build(BuildContext context) =>
+      Scaffold(appBar: AppBar(title: Text('help_title'.tr)));
+}
 
 class SettingsView extends GetView<SettingsController> {
   const SettingsView({super.key});
@@ -57,7 +80,10 @@ class SettingsView extends GetView<SettingsController> {
                       subtitle: 'notifications_desc'.tr,
                       trailing: Text(
                         'configured'.tr,
-                        style: const TextStyle(color: Colors.grey, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                        ),
                       ),
                       onTap: () => Get.toNamed(AppRoutes.notificationSettings),
                     ),
@@ -65,7 +91,6 @@ class SettingsView extends GetView<SettingsController> {
 
                   _buildSectionHeader('tax_section'.tr),
                   _buildSectionCard([
-
                     _buildSettingsItem(
                       icon: Icons.receipt_long_outlined,
                       title: 'tax_settings'.tr,
@@ -105,10 +130,10 @@ class SettingsView extends GetView<SettingsController> {
                   ]),
 
                   const SizedBox(height: 32),
-                  
+
                   // Logout Button
                   _buildLogoutButton(),
-                  
+
                   const SizedBox(height: 100), // Bottom padding
                 ],
               ),
@@ -138,23 +163,44 @@ class SettingsView extends GetView<SettingsController> {
       toolbarHeight: 90,
       title: Padding(
         padding: const EdgeInsets.only(top: 12, bottom: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Text(
-              'settings_title'.tr,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.ink,
+            Container(
+              width: 38,
+              height: 38,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Image.asset(
+                'assets/logo/fineye_logo.png',
+                fit: BoxFit.contain,
               ),
             ),
-            Text(
-              'settings_subtitle'.tr,
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.mutedText,
-                fontWeight: FontWeight.w400,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'settings_title'.tr,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  Text(
+                    'settings_subtitle'.tr,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.mutedText,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -220,15 +266,13 @@ class SettingsView extends GetView<SettingsController> {
           color: AppColors.ink,
         ),
       ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade500,
-              ),
-            )
-          : null,
+      subtitle:
+          subtitle != null
+              ? Text(
+                subtitle,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              )
+              : null,
       trailing: trailing,
     );
   }
@@ -244,7 +288,11 @@ class SettingsView extends GetView<SettingsController> {
             color: Color(0xFFF0F2F5),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.language, color: AppColors.primaryBlue, size: 20),
+          child: const Icon(
+            Icons.language,
+            color: AppColors.primaryBlue,
+            size: 20,
+          ),
         ),
         title: Text(
           'language'.tr,
@@ -254,12 +302,9 @@ class SettingsView extends GetView<SettingsController> {
             color: AppColors.ink,
           ),
         ),
-         subtitle: Text(
+        subtitle: Text(
           'language_subtitle'.tr,
-            style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
         ),
         trailing: Container(
           height: 32,
@@ -288,7 +333,11 @@ class SettingsView extends GetView<SettingsController> {
     });
   }
 
-  Widget _buildToggleOption({required String text, required bool isSelected, required VoidCallback onTap}) {
+  Widget _buildToggleOption({
+    required String text,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -353,10 +402,7 @@ class SettingsView extends GetView<SettingsController> {
         ),
         subtitle: Text(
           'logout_subtitle'.tr,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
         ),
       ),
     );

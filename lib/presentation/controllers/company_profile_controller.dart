@@ -180,7 +180,7 @@ class CompanyProfileController extends GetxController {
   }
 
   Future<void> verifyTrnOnFta() async {
-    final Uri url = Uri.parse('https://eservices.tax.gov.ae/en-us/trn-verification');
+    final Uri url = Uri.parse('https://eservices.tax.gov.ae/#/TRNVerification');
     if (!await launchUrl(url)) {
       SnackbarService.to.showError(
         'title_error'.tr, 

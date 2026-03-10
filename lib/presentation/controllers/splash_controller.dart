@@ -3,10 +3,10 @@ import 'package:flutter/material.dart'; // Needed for Locale
 import 'package:shared_preferences/shared_preferences.dart';
 import 'status_bar_controller.dart';
 import '../../core/constants/app_routes.dart';
+import '../../core/services/activity_tracking_service.dart';
 import '../../../data/services/auth_service.dart';
 
 class SplashController extends GetxController {
-
   // State for Language Panel
   final RxBool showLanguagePanel = false.obs;
   final RxString tempLanguageSelection = ''.obs; // '' means none, 'en', 'ar'
@@ -19,7 +19,7 @@ class SplashController extends GetxController {
     super.onInit();
     // Set status bar to transparent
     Get.find<StatusBarController>().setTransparent();
-    
+
     // Check storage for language preference
     _checkFirstRun();
   }
@@ -39,7 +39,7 @@ class SplashController extends GetxController {
       } else {
         Get.updateLocale(const Locale('en', 'US'));
       }
-      
+
       // Proceed with normal splash timer
       _navigateToNext();
     } else {
@@ -52,7 +52,7 @@ class SplashController extends GetxController {
 
   void selectLanguage(String code) {
     tempLanguageSelection.value = code;
-    
+
     // Update locale immediately for preview
     if (code == 'ar') {
       Get.updateLocale(const Locale('ar', 'AE'));
@@ -65,7 +65,7 @@ class SplashController extends GetxController {
     if (tempLanguageSelection.value.isEmpty) return;
 
     final code = tempLanguageSelection.value;
-    
+
     // 1. Save to storage
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hasSelectedLanguage', true);
@@ -90,6 +90,7 @@ class SplashController extends GetxController {
     // to the main application. Otherwise, show the auth screen.
     final user = _authService.currentUser;
     if (user != null) {
+      await ActivityTrackingService.instance.trackAppOpen();
       Get.offNamed(AppRoutes.main);
     } else {
       Get.offNamed(AppRoutes.auth, arguments: true);

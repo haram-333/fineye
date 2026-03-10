@@ -1,4 +1,6 @@
-import 'dart:io' if (dart.library.html) 'package:fineye/presentation/controllers/file_stub.dart' as io;
+import 'dart:io'
+    if (dart.library.html) 'package:fineye/presentation/controllers/file_stub.dart'
+    as io;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image/image.dart' as img;
 import '../../../data/models/invoice_model.dart';
 import '../../../data/repositories/user_invoice_repository.dart';
 import '../../../data/services/section_based_invoice_extractor.dart';
@@ -25,7 +28,7 @@ class InvoiceDetailsController extends GetxController {
   /// This is required so we can update the correct document even if
   /// the human-readable invoice number changes.
   String? invoiceDocId;
-  
+
   /// File containing the invoice image (for new invoices from OCR) - mobile only
   io.File? invoiceImageFile;
 
@@ -34,7 +37,7 @@ class InvoiceDetailsController extends GetxController {
 
   /// Raw Document AI JSON response (for debugging)
   dynamic rawDocumentAI;
-  
+
   /// Flag to indicate if this is a new invoice (from OCR) or editing existing
   bool isNewInvoice = false;
 
@@ -45,23 +48,28 @@ class InvoiceDetailsController extends GetxController {
   final TextEditingController invoiceNumberController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
   final TextEditingController netAmountController = TextEditingController();
-  final TextEditingController additionalChargesController = TextEditingController();
+  final TextEditingController additionalChargesController =
+      TextEditingController();
 
   // Observable State
-  final Rx<DateTime?> invoiceDate = Rx<DateTime?>(null); // Nullable - only set if date is detected
+  final Rx<DateTime?> invoiceDate = Rx<DateTime?>(
+    null,
+  ); // Nullable - only set if date is detected
+  final RxnString selectedInvoiceType = RxnString(); // purchase | sale
   final RxString selectedCategory = ''.obs;
   final RxBool isVatInclusive = true.obs;
-  final RxBool isPurchase = true.obs;
   final RxDouble netAmount = 0.0.obs;
   final RxDouble vatAmount = 0.0.obs;
   final RxDouble grossAmount = 0.0.obs;
   final RxDouble additionalCharges = 0.0.obs;
-  
+
   // Computed: Final Total = Gross + Additional
-  double get finalTotal => grossAmount.value + additionalCharges.value; // Delivery, service charges, etc.
+  double get finalTotal =>
+      grossAmount.value +
+      additionalCharges.value; // Delivery, service charges, etc.
   final RxBool isCtDeductible = true.obs;
   final RxBool showOriginalInvoice = true.obs;
-  
+
   // Payment Status
   final RxBool isPaid = false.obs; // true = Paid, false = Not Paid
   final Rx<DateTime?> dueDate = Rx<DateTime?>(null); // Due date when not paid
@@ -73,28 +81,44 @@ class InvoiceDetailsController extends GetxController {
 
   // Mock Extraction State
   final RxBool isExtracting = false.obs;
-  
+
   // Saving state
   final RxBool isSaving = false.obs;
-  
+
   // Track if any changes were made
   final RxBool hasChanges = false.obs;
 
   // Risk flags
   final RxList<InvoiceRisk> risks = <InvoiceRisk>[].obs;
 
-  // Categories
-  final List<String> categories = [
-    'Office supplies',
+  List<String> get purchaseCategories => const [
+    'Rent',
     'Utilities',
     'Transport',
-    'Subscriptions',
-    'Marketing',
-    'Professional fees',
-    'Rent',
+    'Office Supplies',
     'Maintenance',
+    'Marketing',
+    'Subscriptions',
+    'Professional Fees',
     'Other',
   ];
+
+  List<String> get saleCategories => const [
+    'Product Sales',
+    'Service Revenue',
+    'Food & Beverage Sales',
+    'Delivery Revenue',
+    'Other Revenue',
+  ];
+
+  List<String> get currentCategories =>
+      selectedInvoiceType.value == 'sale' ? saleCategories : purchaseCategories;
+
+  bool get isPurchase => selectedInvoiceType.value == 'purchase';
+  String get partyLabel {
+    if (selectedInvoiceType.value == null) return 'party'.tr;
+    return isPurchase ? 'supplier'.tr : 'customer'.tr;
+  }
 
   @override
   void onInit() {
@@ -108,7 +132,7 @@ class InvoiceDetailsController extends GetxController {
         invoice = Get.arguments as Invoice;
       } else if (Get.arguments is Map) {
         final args = Get.arguments as Map;
-        
+
         // Check if coming from image preprocessing (new invoice)
         if (args['file'] != null || args['imageBytes'] != null) {
           isNewInvoice = true;
@@ -118,12 +142,13 @@ class InvoiceDetailsController extends GetxController {
           } else if (!kIsWeb && args['file'] != null) {
             invoiceImageFile = args['file'] as io.File?;
           }
-          
+
           // Create new invoice from extracted data
           invoice = Invoice(
             id: '',
             supplierName: '',
-            category: categories.first,
+            invoiceType: 'purchase',
+            category: purchaseCategories.first,
             date: DateTime.now(),
             grossAmount: 0.0,
             vatAmount: 0.0,
@@ -133,16 +158,20 @@ class InvoiceDetailsController extends GetxController {
             isCtDeductible: true,
             vatActivity: 'Low',
           );
-          
+
           // USE structured data from Gemini/Document AI if available
           // This is much more accurate than local regex
           if (args['extractedData'] != null) {
-            print('✅ Invoice Details: Loading structured extracted data from backend...');
+            print(
+              '✅ Invoice Details: Loading structured extracted data from backend...',
+            );
             _loadExtractedData(args['extractedData']);
           } else if (args['rawOcrText'] != null) {
             // Fallback to raw text parsing ONLY if structured data is missing
             final rawText = args['rawOcrText'] as String;
-            print('⚠️ Invoice Details: No structured data, falling back to raw OCR text parsing...');
+            print(
+              '⚠️ Invoice Details: No structured data, falling back to raw OCR text parsing...',
+            );
             _parseRawTextToFields(rawText);
           } else {
             print('❌ Invoice Details: No extraction data available!');
@@ -154,7 +183,8 @@ class InvoiceDetailsController extends GetxController {
           invoice = Invoice(
             id: '',
             supplierName: '',
-            category: categories.first,
+            invoiceType: 'purchase',
+            category: purchaseCategories.first,
             date: DateTime.now(),
             grossAmount: 0.0,
             vatAmount: 0.0,
@@ -175,7 +205,8 @@ class InvoiceDetailsController extends GetxController {
         invoice = Invoice(
           id: '',
           supplierName: '',
-          category: categories.first,
+          invoiceType: 'purchase',
+          category: purchaseCategories.first,
           date: DateTime.now(),
           grossAmount: 0.0,
           vatAmount: 0.0,
@@ -191,7 +222,8 @@ class InvoiceDetailsController extends GetxController {
       invoice = Invoice(
         id: '',
         supplierName: '',
-        category: categories.first,
+        invoiceType: 'purchase',
+        category: purchaseCategories.first,
         date: DateTime.now(),
         grossAmount: 0.0,
         vatAmount: 0.0,
@@ -208,7 +240,7 @@ class InvoiceDetailsController extends GetxController {
     if (invoice.firestoreDocId != null) {
       invoiceDocId = invoice.firestoreDocId;
     }
-    
+
     // DON'T call _loadInvoiceData() for new invoices - it will overwrite parsed values!
     // Only load if we have an existing invoice with real data
     if (!isNewInvoice) {
@@ -219,7 +251,8 @@ class InvoiceDetailsController extends GetxController {
       // For new invoices, initialize payment status based on date
       // If date is in the future, set to Not Paid
       final invoiceDateValue = invoiceDate.value;
-      if (invoiceDateValue != null && invoiceDateValue.isAfter(DateTime.now())) {
+      if (invoiceDateValue != null &&
+          invoiceDateValue.isAfter(DateTime.now())) {
         isPaid.value = false;
       } else {
         // Default to Not Paid for new invoices
@@ -232,7 +265,16 @@ class InvoiceDetailsController extends GetxController {
     // Setup controller sync with reactive values
     _setupControllerSync();
 
-  // Reactivity - ONLY for non-text-field values
+    // Invoice type drives category options and party label.
+    // For new OCR invoices, require an explicit user selection.
+    selectedInvoiceType.value =
+        isNewInvoice
+            ? null
+            : (invoice.invoiceType.isNotEmpty
+                ? invoice.invoiceType
+                : 'purchase');
+
+    // Reactivity - ONLY for non-text-field values
     // DO NOT add listeners that might interfere with text field editing
     ever(invoiceDate, (_) {
       _runRiskAssessment();
@@ -242,10 +284,20 @@ class InvoiceDetailsController extends GetxController {
       _runRiskAssessment();
       _checkForChanges();
     });
+    ever<String?>(selectedInvoiceType, (value) {
+      final String nextType = value ?? 'purchase';
+      final available =
+          nextType == 'sale' ? saleCategories : purchaseCategories;
+      if (!available.contains(selectedCategory.value)) {
+        selectedCategory.value = '';
+      }
+      _runRiskAssessment();
+      _checkForChanges();
+    });
     ever(isCtDeductible, (_) => _checkForChanges());
     ever(isPaid, (_) => _checkForChanges());
     ever(dueDate, (_) => _checkForChanges());
-    
+
     // Text field controllers - these are the source of truth
     supplierController.addListener(() {
       _runRiskAssessment();
@@ -253,11 +305,16 @@ class InvoiceDetailsController extends GetxController {
     });
     invoiceNumberController.addListener(_checkForChanges);
     notesController.addListener(_checkForChanges);
-    
+
     // Amount controllers - update reactive values ONLY, never touch controller text
     netAmountController.addListener(() {
       final text = netAmountController.text;
-      final cleaned = text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
+      final cleaned =
+          text
+              .replaceAll('AED', '')
+              .replaceAll(',', '')
+              .replaceAll(' ', '')
+              .trim();
       if (cleaned.isEmpty || cleaned == '.') {
         if (netAmount.value != 0.0) {
           netAmount.value = 0.0;
@@ -280,10 +337,15 @@ class InvoiceDetailsController extends GetxController {
         }
       }
     });
-    
+
     additionalChargesController.addListener(() {
       final text = additionalChargesController.text;
-      final cleaned = text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
+      final cleaned =
+          text
+              .replaceAll('AED', '')
+              .replaceAll(',', '')
+              .replaceAll(' ', '')
+              .trim();
       if (cleaned.isEmpty || cleaned == '.') {
         if (additionalCharges.value != 0.0) {
           additionalCharges.value = 0.0;
@@ -316,36 +378,48 @@ class InvoiceDetailsController extends GetxController {
       // Extract supplier name
       if (extractedData.supplierName?.value != null) {
         supplierController.text = extractedData.supplierName.value;
-        print('✅ Invoice Details: Loaded supplier: ${extractedData.supplierName.value}');
+        print(
+          '✅ Invoice Details: Loaded supplier: ${extractedData.supplierName.value}',
+        );
       }
 
       // Extract invoice number
       if (extractedData.invoiceNumber?.value != null) {
         invoiceNumberController.text = extractedData.invoiceNumber.value;
-        print('✅ Invoice Details: Loaded invoice number: ${extractedData.invoiceNumber.value}');
+        print(
+          '✅ Invoice Details: Loaded invoice number: ${extractedData.invoiceNumber.value}',
+        );
       }
 
       // Extract invoice date
       if (extractedData.invoiceDate?.value != null) {
         invoiceDate.value = extractedData.invoiceDate.value;
-        print('✅ Invoice Details: Loaded invoice date: ${extractedData.invoiceDate.value}');
+        print(
+          '✅ Invoice Details: Loaded invoice date: ${extractedData.invoiceDate.value}',
+        );
       }
 
       // Extract amounts
       if (extractedData.netAmount != null && extractedData.netAmount > 0) {
         netAmount.value = extractedData.netAmount;
         netAmountController.text = extractedData.netAmount.toStringAsFixed(2);
-        print('✅ Invoice Details: Loaded net amount: ${extractedData.netAmount}');
+        print(
+          '✅ Invoice Details: Loaded net amount: ${extractedData.netAmount}',
+        );
       }
 
       if (extractedData.vatAmount != null && extractedData.vatAmount > 0) {
         vatAmount.value = extractedData.vatAmount;
-        print('✅ Invoice Details: Loaded VAT amount: ${extractedData.vatAmount}');
+        print(
+          '✅ Invoice Details: Loaded VAT amount: ${extractedData.vatAmount}',
+        );
       }
 
       if (extractedData.grossAmount != null && extractedData.grossAmount > 0) {
         grossAmount.value = extractedData.grossAmount;
-        print('✅ Invoice Details: Loaded gross amount: ${extractedData.grossAmount}');
+        print(
+          '✅ Invoice Details: Loaded gross amount: ${extractedData.grossAmount}',
+        );
       }
 
       // Calculate missing amounts if needed
@@ -356,10 +430,14 @@ class InvoiceDetailsController extends GetxController {
 
       if (netAmount.value > 0 && grossAmount.value == 0.0) {
         grossAmount.value = netAmount.value + vatAmount.value;
-        print('✅ Invoice Details: Calculated gross amount: ${grossAmount.value}');
+        print(
+          '✅ Invoice Details: Calculated gross amount: ${grossAmount.value}',
+        );
       }
 
-      print('📊 Invoice Details: Final loaded values - Net: ${netAmount.value}, VAT: ${vatAmount.value}, Gross: ${grossAmount.value}');
+      print(
+        '📊 Invoice Details: Final loaded values - Net: ${netAmount.value}, VAT: ${vatAmount.value}, Gross: ${grossAmount.value}',
+      );
     } catch (e, stackTrace) {
       print('❌❌❌ Invoice Details: ERROR LOADING EXTRACTED DATA ❌❌❌');
       print('❌ Error Type: ${e.runtimeType}');
@@ -372,66 +450,90 @@ class InvoiceDetailsController extends GetxController {
       debugPrint('❌ Stack Trace: $stackTrace');
     }
   }
-  
+
   void _checkForChanges() {
     if (isNewInvoice) {
       hasChanges.value = true; // New invoices always have changes
       return;
     }
-    
+
     // Calculate net amount from invoice for comparison
-    final invoiceNetAmount = invoice.grossAmount - invoice.vatAmount - invoice.additionalCharges;
-    
+    final invoiceNetAmount =
+        invoice.grossAmount - invoice.vatAmount - invoice.additionalCharges;
+
     // Compare current values with original invoice - include ALL fields
-    hasChanges.value = 
-      supplierController.text.trim() != invoice.supplierName.trim() ||
-      invoiceNumberController.text.trim() != invoice.id.trim() ||
-      (invoiceDate.value != null && !invoiceDate.value!.isAtSameMomentAs(invoice.date)) ||
-      (invoiceDate.value == null && invoice.date != DateTime.now()) ||
-      selectedCategory.value != invoice.category ||
-      (netAmount.value - invoiceNetAmount).abs() > 0.01 || // Allow small floating point differences
-      (vatAmount.value - invoice.vatAmount).abs() > 0.01 ||
-      (grossAmount.value - invoice.grossAmount).abs() > 0.01 ||
-      (additionalCharges.value - invoice.additionalCharges).abs() > 0.01 ||
-      isCtDeductible.value != invoice.isCtDeductible ||
-      notesController.text.trim() != invoice.notes.trim() ||
-      isPaid.value != (invoice.status == 'Paid') ||
-      (dueDate.value != null && invoice.dueDate != null && !dueDate.value!.isAtSameMomentAs(invoice.dueDate!)) ||
-      (dueDate.value == null && invoice.dueDate != null) ||
-      (dueDate.value != null && invoice.dueDate == null);
-    
+    hasChanges.value =
+        supplierController.text.trim() != invoice.supplierName.trim() ||
+        invoiceNumberController.text.trim() != invoice.id.trim() ||
+        (invoiceDate.value != null &&
+            !invoiceDate.value!.isAtSameMomentAs(invoice.date)) ||
+        (invoiceDate.value == null && invoice.date != DateTime.now()) ||
+        (selectedInvoiceType.value ?? 'purchase') != invoice.invoiceType ||
+        selectedCategory.value != invoice.category ||
+        (netAmount.value - invoiceNetAmount).abs() >
+            0.01 || // Allow small floating point differences
+        (vatAmount.value - invoice.vatAmount).abs() > 0.01 ||
+        (grossAmount.value - invoice.grossAmount).abs() > 0.01 ||
+        (additionalCharges.value - invoice.additionalCharges).abs() > 0.01 ||
+        isCtDeductible.value != invoice.isCtDeductible ||
+        notesController.text.trim() != invoice.notes.trim() ||
+        isPaid.value != (invoice.status == 'Paid') ||
+        (dueDate.value != null &&
+            invoice.dueDate != null &&
+            !dueDate.value!.isAtSameMomentAs(invoice.dueDate!)) ||
+        (dueDate.value == null && invoice.dueDate != null) ||
+        (dueDate.value != null && invoice.dueDate == null);
+
     debugPrint('🔍 Change detection: hasChanges=${hasChanges.value}');
-    debugPrint('  Supplier: "${supplierController.text.trim()}" vs "${invoice.supplierName.trim()}"');
-    debugPrint('  Invoice #: "${invoiceNumberController.text.trim()}" vs "${invoice.id.trim()}"');
-    debugPrint('  Category: "${selectedCategory.value}" vs "${invoice.category}"');
+    debugPrint(
+      '  Supplier: "${supplierController.text.trim()}" vs "${invoice.supplierName.trim()}"',
+    );
+    debugPrint(
+      '  Invoice #: "${invoiceNumberController.text.trim()}" vs "${invoice.id.trim()}"',
+    );
+    debugPrint(
+      '  Invoice Type: "${selectedInvoiceType.value}" vs "${invoice.invoiceType}"',
+    );
+    debugPrint(
+      '  Category: "${selectedCategory.value}" vs "${invoice.category}"',
+    );
     debugPrint('  Net: ${netAmount.value} vs ${invoiceNetAmount}');
     debugPrint('  VAT: ${vatAmount.value} vs ${invoice.vatAmount}');
     debugPrint('  Gross: ${grossAmount.value} vs ${invoice.grossAmount}');
-    debugPrint('  Additional: ${additionalCharges.value} vs ${invoice.additionalCharges}');
-    debugPrint('  CT Deductible: ${isCtDeductible.value} vs ${invoice.isCtDeductible}');
-    debugPrint('  Notes: "${notesController.text.trim()}" vs "${invoice.notes.trim()}"');
+    debugPrint(
+      '  Additional: ${additionalCharges.value} vs ${invoice.additionalCharges}',
+    );
+    debugPrint(
+      '  CT Deductible: ${isCtDeductible.value} vs ${invoice.isCtDeductible}',
+    );
+    debugPrint(
+      '  Notes: "${notesController.text.trim()}" vs "${invoice.notes.trim()}"',
+    );
     debugPrint('  Paid: ${isPaid.value} vs ${invoice.status == 'Paid'}');
     debugPrint('  Due Date: ${dueDate.value} vs ${invoice.dueDate}');
   }
 
-  
   /// Parse raw OCR text using section-based extraction
   /// Divides invoice into sections and extracts data from each
   void _parseRawTextToFields(String text) {
     if (text.isEmpty) return;
-    
-    print('🔍 Invoice Details: Parsing raw OCR text using section-based extraction...');
+
+    print(
+      '🔍 Invoice Details: Parsing raw OCR text using section-based extraction...',
+    );
     print('📄 Raw text length: ${text.length} characters');
-    
+
     // Use section-based extractor
     final result = SectionBasedInvoiceExtractor.extractFromSections(text);
-    
+
     if (result.isEmpty) {
-      print('⚠️ No data extracted from sections, falling back to simple parsing...');
+      print(
+        '⚠️ No data extracted from sections, falling back to simple parsing...',
+      );
       _parseRawTextToFieldsSimple(text);
       return;
     }
-    
+
     print('✅ Section-based extraction results:');
     print('   Supplier: ${result.supplierName ?? "not found"}');
     print('   Invoice #: ${result.invoiceNumber ?? "not found"}');
@@ -439,7 +541,7 @@ class InvoiceDetailsController extends GetxController {
     print('   Subtotal: ${result.subtotal ?? "not found"}');
     print('   VAT: ${result.vatAmount ?? "not found"}');
     print('   Total: ${result.totalAmount ?? "not found"}');
-    
+
     // Load supplier name (always set if extracted, even if field already has value)
     if (result.supplierName != null && result.supplierName!.isNotEmpty) {
       supplierController.text = result.supplierName!;
@@ -447,53 +549,64 @@ class InvoiceDetailsController extends GetxController {
     } else {
       print('⚠️ Supplier name not extracted from invoice');
       // Fallback: try to extract from first line of raw text
-      final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+      final lines =
+          text
+              .split('\n')
+              .map((l) => l.trim())
+              .where((l) => l.isNotEmpty)
+              .toList();
       if (lines.isNotEmpty && supplierController.text.isEmpty) {
         final firstLine = lines[0];
         // Only use if it's not a date, number, or amount
-        if (firstLine.length >= 2 && 
+        if (firstLine.length >= 2 &&
             firstLine.length <= 100 &&
-            !RegExp(r'^\d+$').hasMatch(firstLine.replaceAll(',', '').replaceAll('.', '')) &&
+            !RegExp(
+              r'^\d+$',
+            ).hasMatch(firstLine.replaceAll(',', '').replaceAll('.', '')) &&
             !RegExp(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}').hasMatch(firstLine)) {
           supplierController.text = firstLine;
           print('✅ Loaded Supplier (fallback from first line): $firstLine');
         }
       }
     }
-    
+
     // Load invoice number (only if empty)
     if (result.invoiceNumber != null && invoiceNumberController.text.isEmpty) {
       invoiceNumberController.text = result.invoiceNumber!;
       print('✅ Loaded Invoice #: ${result.invoiceNumber}');
     }
-    
+
     // Load invoice date (only if empty)
     if (result.invoiceDate != null && invoiceDate.value == null) {
       invoiceDate.value = result.invoiceDate;
       print('✅ Loaded Invoice Date: ${result.invoiceDate}');
     }
-    
+
     // Load amounts (MOST IMPORTANT - subtotal/net amount without VAT)
     // Priority: Subtotal > Net Amount
     if (result.subtotal != null && netAmount.value == 0.0) {
       netAmount.value = result.subtotal!;
       netAmountController.text = result.subtotal!.toStringAsFixed(2);
       print('✅ Loaded Subtotal/Net Amount: ${result.subtotal}');
-      
+
       // Always calculate 5% VAT from subtotal/net amount
       vatAmount.value = result.subtotal! * 0.05;
       print('✅ Calculated VAT (5%): ${vatAmount.value}');
-      
+
       // Calculate Gross = Subtotal + VAT
       grossAmount.value = result.subtotal! + vatAmount.value;
       print('✅ Calculated Gross Amount: ${grossAmount.value}');
-    } else if (result.totalAmount != null && netAmount.value == 0.0 && result.subtotal == null) {
+    } else if (result.totalAmount != null &&
+        netAmount.value == 0.0 &&
+        result.subtotal == null) {
       // If only total is found, calculate backwards
       netAmount.value = result.totalAmount! / 1.05;
       netAmountController.text = netAmount.value.toStringAsFixed(2);
       vatAmount.value = result.totalAmount! - netAmount.value;
       grossAmount.value = result.totalAmount!;
-      print('✅ Calculated Subtotal and VAT from Total: Subtotal=${netAmount.value}, VAT=${vatAmount.value}');
+      print(
+        '✅ Calculated Subtotal and VAT from Total: Subtotal=${netAmount.value}, VAT=${vatAmount.value}',
+      );
     } else {
       // If VAT was explicitly found, use it, otherwise calculate 5%
       if (result.vatAmount != null && vatAmount.value == 0.0) {
@@ -504,7 +617,7 @@ class InvoiceDetailsController extends GetxController {
         vatAmount.value = netAmount.value * 0.05;
         print('✅ Calculated VAT (5%) from Net Amount: ${vatAmount.value}');
       }
-      
+
       // Set gross amount
       if (result.totalAmount != null && grossAmount.value == 0.0) {
         grossAmount.value = result.totalAmount!;
@@ -515,17 +628,24 @@ class InvoiceDetailsController extends GetxController {
         print('✅ Calculated Gross Amount: ${grossAmount.value}');
       }
     }
-    
-    print('📊 FINAL: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}');
+
+    print(
+      '📊 FINAL: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}',
+    );
   }
-  
+
   /// Fallback: Simple parsing if section-based extraction fails
   void _parseRawTextToFieldsSimple(String text) {
     if (text.isEmpty) return;
-    
+
     print('🔍 Invoice Details: Using simple parsing fallback...');
-    
-    final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+
+    final lines =
+        text
+            .split('\n')
+            .map((l) => l.trim())
+            .where((l) => l.isNotEmpty)
+            .toList();
 
     // 1. Supplier: First line usually (always set if not already set)
     if (lines.isNotEmpty && lines[0].trim().isNotEmpty) {
@@ -535,20 +655,20 @@ class InvoiceDetailsController extends GetxController {
         print('✅ Supplier (Simple): ${lines[0].trim()}');
       }
     }
-    
+
     // 2. Invoice Number: Multiple patterns
     // Pattern 1: "Bill NO: 54098"
     // Pattern 2: "Check: 406587" or "Check : 406587"
     // Pattern 3: "Invoice No:" or "Invoice Number:"
     String? invoiceNumber;
-    
+
     final patterns = [
       RegExp(r'Bill\s+NO\s*:?\s*(\d+)', caseSensitive: false),
       RegExp(r'Check\s*:?\s*(\d+)', caseSensitive: false),
       RegExp(r'Invoice\s+(?:No|Number)\s*:?\s*(\d+)', caseSensitive: false),
       RegExp(r'Invoice\s*#\s*:?\s*(\d+)', caseSensitive: false),
     ];
-    
+
     for (final pattern in patterns) {
       final match = pattern.firstMatch(text);
       if (match != null) {
@@ -557,35 +677,51 @@ class InvoiceDetailsController extends GetxController {
         break;
       }
     }
-    
+
     if (invoiceNumber != null && invoiceNumberController.text.isEmpty) {
       invoiceNumberController.text = invoiceNumber;
     } else if (invoiceNumber == null) {
       print('⚠️ Invoice number not detected');
     }
-    
+
     // 3. Date: Multiple formats supported
     // Format 1: "02-Apr-25" or "15-Apr-18"
     // Format 2: "15 Apr, 18" or "15 Apr 18" (with or without comma)
     // Format 3: "Date : 15 Apr, 18" (with label)
     DateTime? parsedDate;
-    
+
     // Try format: "15 Apr, 18" or "15 Apr 18" (with space and optional comma)
     // Also handles "Date : 15 Apr, 18"
-    final dateMatch1 = RegExp(r'(?:Date\s*:?\s*)?(\d{1,2})\s+([A-Za-z]{3})[a-z]*,?\s+(\d{2})\b', caseSensitive: false).firstMatch(text);
+    final dateMatch1 = RegExp(
+      r'(?:Date\s*:?\s*)?(\d{1,2})\s+([A-Za-z]{3})[a-z]*,?\s+(\d{2})\b',
+      caseSensitive: false,
+    ).firstMatch(text);
     if (dateMatch1 != null) {
       try {
         final day = int.parse(dateMatch1.group(1)!);
         final monthStr = dateMatch1.group(2)!.toLowerCase();
         final yearShort = int.parse(dateMatch1.group(3)!);
-        
+
         // Convert 2-digit year: 00-49 = 2000-2049, 50-99 = 1950-1999
         final year = yearShort < 50 ? 2000 + yearShort : 1900 + yearShort;
-        
+
         // Parse month name
-        final monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+        final monthNames = [
+          'jan',
+          'feb',
+          'mar',
+          'apr',
+          'may',
+          'jun',
+          'jul',
+          'aug',
+          'sep',
+          'oct',
+          'nov',
+          'dec',
+        ];
         final month = monthNames.indexOf(monthStr.substring(0, 3)) + 1;
-        
+
         if (month > 0 && day >= 1 && day <= 31) {
           parsedDate = DateTime(year, month, day);
           print('✅ Date: $parsedDate from "${dateMatch1.group(0)}"');
@@ -594,23 +730,39 @@ class InvoiceDetailsController extends GetxController {
         print('⚠️ Date parse failed (format 1): $e');
       }
     }
-    
+
     // Try format: "02-Apr-25" (with dashes)
     if (parsedDate == null) {
-      final dateMatch2 = RegExp(r'(\d{1,2})-([A-Za-z]{3})-(\d{2})\b', caseSensitive: false).firstMatch(text);
+      final dateMatch2 = RegExp(
+        r'(\d{1,2})-([A-Za-z]{3})-(\d{2})\b',
+        caseSensitive: false,
+      ).firstMatch(text);
       if (dateMatch2 != null) {
         try {
           final day = int.parse(dateMatch2.group(1)!);
           final monthStr = dateMatch2.group(2)!.toLowerCase();
           final yearShort = int.parse(dateMatch2.group(3)!);
-          
+
           // Convert 2-digit year: 00-49 = 2000-2049, 50-99 = 1950-1999
           final year = yearShort < 50 ? 2000 + yearShort : 1900 + yearShort;
-          
+
           // Parse month name
-          final monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+          final monthNames = [
+            'jan',
+            'feb',
+            'mar',
+            'apr',
+            'may',
+            'jun',
+            'jul',
+            'aug',
+            'sep',
+            'oct',
+            'nov',
+            'dec',
+          ];
           final month = monthNames.indexOf(monthStr.substring(0, 3)) + 1;
-          
+
           if (month > 0 && day >= 1 && day <= 31) {
             parsedDate = DateTime(year, month, day);
             print('✅ Date: $parsedDate from "${dateMatch2.group(0)}"');
@@ -620,17 +772,22 @@ class InvoiceDetailsController extends GetxController {
         }
       }
     }
-    
+
     // Try format: "DD/MM/YYYY" or "DD-MM-YYYY"
     if (parsedDate == null) {
-      final dateMatch3 = RegExp(r'(?:Date\s*:?\s*)?(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b').firstMatch(text);
+      final dateMatch3 = RegExp(
+        r'(?:Date\s*:?\s*)?(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b',
+      ).firstMatch(text);
       if (dateMatch3 != null) {
         try {
           final day = int.parse(dateMatch3.group(1)!);
           final month = int.parse(dateMatch3.group(2)!);
           final yearRaw = int.parse(dateMatch3.group(3)!);
-          final year = yearRaw < 100 ? (yearRaw < 50 ? 2000 + yearRaw : 1900 + yearRaw) : yearRaw;
-          
+          final year =
+              yearRaw < 100
+                  ? (yearRaw < 50 ? 2000 + yearRaw : 1900 + yearRaw)
+                  : yearRaw;
+
           if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
             parsedDate = DateTime(year, month, day);
             print('✅ Date: $parsedDate from "${dateMatch3.group(0)}"');
@@ -640,18 +797,18 @@ class InvoiceDetailsController extends GetxController {
         }
       }
     }
-    
+
     // Only set date if successfully parsed
     if (parsedDate != null) {
       invoiceDate.value = parsedDate;
     } else {
       print('⚠️ Date not detected or format not supported');
     }
-    
+
     // 4. Amount extraction: Find subtotal, calculate 5% VAT, then gross
     // Strategy: Find subtotal/net amount (before VAT), calculate VAT = subtotal * 0.05, gross = subtotal + VAT
     double? subtotal;
-    
+
     // Look for subtotal labels in the text (case-insensitive)
     final subtotalLabels = [
       r'Sub\.?\s*Total\s*:?\s*(?:AED\s*)?([\d,]+\.?\d{2}?)',
@@ -661,7 +818,7 @@ class InvoiceDetailsController extends GetxController {
       r'Amount\s+excl\.?\s*VAT\s*:?\s*(?:AED\s*)?([\d,]+\.?\d{2}?)',
       r'Amount\s+before\s+VAT\s*:?\s*(?:AED\s*)?([\d,]+\.?\d{2}?)',
     ];
-    
+
     for (final pattern in subtotalLabels) {
       final match = RegExp(pattern, caseSensitive: false).firstMatch(text);
       if (match != null) {
@@ -669,7 +826,9 @@ class InvoiceDetailsController extends GetxController {
           final amountStr = match.group(1)!.replaceAll(',', '');
           subtotal = double.tryParse(amountStr);
           if (subtotal != null && subtotal > 0) {
-            print('✅ Found Subtotal: $subtotal from pattern "${match.group(0)}"');
+            print(
+              '✅ Found Subtotal: $subtotal from pattern "${match.group(0)}"',
+            );
             break;
           }
         } catch (e) {
@@ -677,13 +836,13 @@ class InvoiceDetailsController extends GetxController {
         }
       }
     }
-    
+
     // Fallback: Look for amounts in the totals section and find the one before "VAT" or "Total"
     if (subtotal == null) {
       final startIdx = (lines.length * 0.7).toInt();
       final amounts = <double>[];
       final amountLines = <String>[];
-      
+
       for (int i = startIdx; i < lines.length; i++) {
         final line = lines[i].toLowerCase();
         final match = RegExp(r'([\d,]+\.\d{2})').firstMatch(lines[i]);
@@ -696,21 +855,26 @@ class InvoiceDetailsController extends GetxController {
           }
         }
       }
-      
+
       // Look for the amount that appears before "VAT" or before the final "Total"
       if (amounts.isNotEmpty) {
         // Find the largest amount that's NOT the grand total
         // Usually subtotal is the second largest or appears before "VAT" label
-        final sorted = List<double>.from(amounts)..sort((a, b) => b.compareTo(a));
-        
+        final sorted = List<double>.from(amounts)
+          ..sort((a, b) => b.compareTo(a));
+
         // Check if any line contains "vat" and get the amount before it
         for (int i = startIdx; i < lines.length; i++) {
           final line = lines[i].toLowerCase();
           if (line.contains('vat') && i > startIdx) {
             // Look for amount in previous line
-            final prevMatch = RegExp(r'([\d,]+\.\d{2})').firstMatch(lines[i - 1]);
+            final prevMatch = RegExp(
+              r'([\d,]+\.\d{2})',
+            ).firstMatch(lines[i - 1]);
             if (prevMatch != null) {
-              final prevAmount = double.tryParse(prevMatch.group(1)!.replaceAll(',', ''));
+              final prevAmount = double.tryParse(
+                prevMatch.group(1)!.replaceAll(',', ''),
+              );
               if (prevAmount != null && prevAmount > 0) {
                 subtotal = prevAmount;
                 print('✅ Found Subtotal before VAT: $subtotal');
@@ -719,10 +883,10 @@ class InvoiceDetailsController extends GetxController {
             }
           }
         }
-        
+
         // If still not found, use second largest amount (assuming largest is grand total)
         if (subtotal == null && sorted.length >= 2) {
-          subtotal = sorted[1];  // Second largest is likely subtotal
+          subtotal = sorted[1]; // Second largest is likely subtotal
           print('✅ Using second largest amount as Subtotal: $subtotal');
         } else if (subtotal == null && sorted.isNotEmpty) {
           // If only one amount, check if it could be subtotal (not grand total)
@@ -732,24 +896,28 @@ class InvoiceDetailsController extends GetxController {
         }
       }
     }
-    
+
     // Calculate VAT and Gross from Subtotal
     if (subtotal != null && subtotal > 0) {
       netAmount.value = subtotal;
       netAmountController.text = subtotal.toStringAsFixed(2);
-      
+
       // Calculate VAT as 5% of subtotal
       vatAmount.value = (subtotal * 0.05);
-      
+
       // Calculate Gross = Subtotal + VAT
       grossAmount.value = subtotal + vatAmount.value;
-      
-      print('✅ CALCULATED: Subtotal=$subtotal, VAT (5%)=${vatAmount.value.toStringAsFixed(2)}, Gross=${grossAmount.value.toStringAsFixed(2)}');
+
+      print(
+        '✅ CALCULATED: Subtotal=$subtotal, VAT (5%)=${vatAmount.value.toStringAsFixed(2)}, Gross=${grossAmount.value.toStringAsFixed(2)}',
+      );
     } else {
       print('⚠️ Could not find subtotal in invoice');
     }
-    
-    print('📊 FINAL: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}, Additional=${additionalCharges.value}');
+
+    print(
+      '📊 FINAL: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}, Additional=${additionalCharges.value}',
+    );
   }
 
   void _loadInvoiceData() {
@@ -757,9 +925,14 @@ class InvoiceDetailsController extends GetxController {
     invoiceNumberController.text = invoice.id;
     notesController.text = invoice.notes;
     invoiceDate.value = invoice.date;
+    selectedInvoiceType.value =
+        invoice.invoiceType.isNotEmpty ? invoice.invoiceType : 'purchase';
     selectedCategory.value = invoice.category;
+    if (!currentCategories.contains(selectedCategory.value)) {
+      selectedCategory.value = '';
+    }
     isCtDeductible.value = invoice.isCtDeductible;
-    
+
     // Initialize payment status from invoice
     isPaid.value = invoice.status == 'Paid';
     dueDate.value = invoice.dueDate;
@@ -767,10 +940,12 @@ class InvoiceDetailsController extends GetxController {
     grossAmount.value = invoice.grossAmount;
     vatAmount.value = invoice.vatAmount;
     additionalCharges.value = invoice.additionalCharges;
+    netAmount.value = invoice.netAmount;
 
     // Calculate net from gross if needed
     if (grossAmount.value > 0 && netAmount.value == 0.0) {
-      netAmount.value = grossAmount.value - vatAmount.value - additionalCharges.value;
+      netAmount.value =
+          grossAmount.value - vatAmount.value - additionalCharges.value;
     }
 
     // Initialize text controllers with current values
@@ -779,16 +954,23 @@ class InvoiceDetailsController extends GetxController {
     } else {
       netAmountController.clear();
     }
-    
+
     if (additionalCharges.value > 0) {
-      additionalChargesController.text = additionalCharges.value.toStringAsFixed(2);
+      additionalChargesController.text = additionalCharges.value
+          .toStringAsFixed(2);
     } else {
       additionalChargesController.clear();
     }
-    
-    debugPrint('✅ Initialized Net Amount controller: ${netAmountController.text}');
-    debugPrint('✅ Initialized Additional Charges controller: ${additionalChargesController.text}');
-    debugPrint('✅ Loaded from Firebase: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}, Additional=${additionalCharges.value}');
+
+    debugPrint(
+      '✅ Initialized Net Amount controller: ${netAmountController.text}',
+    );
+    debugPrint(
+      '✅ Initialized Additional Charges controller: ${additionalChargesController.text}',
+    );
+    debugPrint(
+      '✅ Loaded from Firebase: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}, Additional=${additionalCharges.value}',
+    );
 
     // Determine VAT inclusive state based on data (mock logic or default)
     // For this demo, let's assume default is inclusive
@@ -814,18 +996,20 @@ class InvoiceDetailsController extends GetxController {
     // VAT is ALWAYS calculated from Net Amount only (5% of net)
     // Additional charges are NOT part of VAT calculation
     // Gross = Net + VAT (NOT including additional charges)
-    
+
     // CRITICAL: NEVER update controller text here - only update reactive values
     if (netAmount.value > 0) {
       // Calculate VAT from net (5%)
       final calculatedVat = netAmount.value * 0.05;
       // Round to 2 decimals
       vatAmount.value = (calculatedVat * 100).roundToDouble() / 100;
-      
+
       // Gross = Net + VAT ONLY (additional charges are separate!)
       grossAmount.value = netAmount.value + vatAmount.value;
-      
-      print('💰 VAT Calculation: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}, Additional=${additionalCharges.value}');
+
+      print(
+        '💰 VAT Calculation: Net=${netAmount.value}, VAT=${vatAmount.value}, Gross=${grossAmount.value}, Additional=${additionalCharges.value}',
+      );
     } else if (grossAmount.value > 0 && fromGross) {
       // Calculate from gross (reverse: gross = net + vat, so net = gross / 1.05)
       // BUT: Don't update netAmount.value if user is currently editing it!
@@ -834,12 +1018,16 @@ class InvoiceDetailsController extends GetxController {
         netAmount.value = grossAmount.value / 1.05;
         vatAmount.value = grossAmount.value - netAmount.value;
         // Update controller text ONLY if it's empty
-        if (netAmountController.text.isEmpty || netAmountController.text == '0.00' || netAmountController.text == '0') {
+        if (netAmountController.text.isEmpty ||
+            netAmountController.text == '0.00' ||
+            netAmountController.text == '0') {
           netAmountController.text = netAmount.value.toStringAsFixed(2);
         }
       }
-      
-      print('💰 VAT Calculation (from gross): Gross=${grossAmount.value}, Net=${netAmount.value}, VAT=${vatAmount.value}');
+
+      print(
+        '💰 VAT Calculation (from gross): Gross=${grossAmount.value}, Net=${netAmount.value}, VAT=${vatAmount.value}',
+      );
     } else {
       // If both net and gross are 0, reset VAT
       vatAmount.value = 0.0;
@@ -853,8 +1041,10 @@ class InvoiceDetailsController extends GetxController {
     final tempInvoice = Invoice(
       id: invoiceNumberController.text,
       supplierName: supplierController.text,
+      invoiceType: selectedInvoiceType.value ?? 'purchase',
       category: selectedCategory.value,
       date: invoiceDate.value ?? DateTime.now(),
+      netAmount: netAmount.value,
       grossAmount: grossAmount.value,
       vatAmount: vatAmount.value,
       status: invoice.status, // Preserve status
@@ -867,20 +1057,28 @@ class InvoiceDetailsController extends GetxController {
     // 2. Get InvoiceListController (source of truth for logic)
     if (Get.isRegistered<InvoiceListController>()) {
       final listController = Get.find<InvoiceListController>();
-      
+
       // 3. Run assessment
-      final detectedRisks = listController.assessInvoiceRisks(tempInvoice, listController.invoices);
-      
+      final detectedRisks = listController.assessInvoiceRisks(
+        tempInvoice,
+        listController.invoices,
+      );
+
       // 4. Update local state
       risks.assignAll(detectedRisks);
-      
+
       // Update specific flags for UI helpers
-      vatValid.value = !detectedRisks.any((r) => r.type == InvoiceRiskType.vatMismatch);
-      isDuplicate.value = detectedRisks.any((r) => r.type == InvoiceRiskType.duplicateInvoice);
-      
+      vatValid.value =
+          !detectedRisks.any((r) => r.type == InvoiceRiskType.vatMismatch);
+      isDuplicate.value = detectedRisks.any(
+        (r) => r.type == InvoiceRiskType.duplicateInvoice,
+      );
+
       missingFields.clear();
-      if (detectedRisks.any((r) => r.type == InvoiceRiskType.missingSupplier)) missingFields.add('Supplier');
-      if (detectedRisks.any((r) => r.type == InvoiceRiskType.missingAmount)) missingFields.add('Total Amount');
+      if (detectedRisks.any((r) => r.type == InvoiceRiskType.missingSupplier))
+        missingFields.add('Supplier');
+      if (detectedRisks.any((r) => r.type == InvoiceRiskType.missingAmount))
+        missingFields.add('Total Amount');
     }
   }
 
@@ -923,72 +1121,94 @@ class InvoiceDetailsController extends GetxController {
       print('⚠️ Already saving, ignoring duplicate call');
       return;
     }
-    
+
     // Validate required fields BEFORE setting isSaving
     if (supplierController.text.isEmpty) {
-      SnackbarService.to.showError(
-        'Validation Error',
-        'Supplier name is required',
-      );
+      SnackbarService.to.showError('title_error'.tr, 'supplier_required'.tr);
       return;
     }
 
     if (invoiceNumberController.text.isEmpty) {
       SnackbarService.to.showError(
-        'Validation Error',
-        'Invoice number is required',
+        'title_error'.tr,
+        'invoice_number_required'.tr,
+      );
+      return;
+    }
+
+    if (selectedInvoiceType.value == null ||
+        selectedInvoiceType.value!.isEmpty) {
+      SnackbarService.to.showError(
+        'title_error'.tr,
+        'invoice_type_required_error'.tr,
       );
       return;
     }
 
     if (grossAmount.value <= 0) {
-      SnackbarService.to.showError(
-        'Validation Error',
-        'Gross amount must be greater than 0',
-      );
+      SnackbarService.to.showError('title_error'.tr, 'gross_amount_gt_zero'.tr);
       return;
     }
 
     // Validate due date if unpaid
     if (!isPaid.value && dueDate.value == null) {
-      SnackbarService.to.showError(
-        'Validation Error',
-        'Due date is required when invoice is not paid',
-      );
+      SnackbarService.to.showError('title_error'.tr, 'due_date_required'.tr);
       return;
     }
 
     // Set isSaving AFTER validation
     isSaving.value = true;
-    
+
     try {
       print('💾 confirmAndSave: Starting save process');
-      
+
       // Check if this is a new invoice (from OCR)
       if (isNewInvoice) {
         print('💾 confirmAndSave: Saving as NEW invoice');
-        SnackbarService.to.showInfo(
-          'Saving',
-          'Saving invoice to database...',
-        );
+        SnackbarService.to.showInfo('title_info'.tr, 'saving_invoice'.tr);
         // Save as NEW invoice
         await _saveNewInvoice();
         return;
       }
-      
+
       print('💾 confirmAndSave: Updating EXISTING invoice');
-      SnackbarService.to.showInfo(
-        'Updating',
-        'Updating invoice...',
+      SnackbarService.to.showInfo('title_info'.tr, 'updating_invoice'.tr);
+
+      // Block if edited invoice number already exists on another invoice for this user.
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        SnackbarService.to.showError('error'.tr, 'must_login'.tr);
+        return;
+      }
+      final currentDocId = invoice.firestoreDocId ?? invoiceDocId ?? invoice.id;
+      final duplicateReason = await _findDuplicateForCurrentUser(
+        userId: currentUser.uid,
+        candidateFingerprint: null,
+        candidateInvoiceNumber: invoiceNumberController.text,
+        candidateSupplier: supplierController.text,
+        candidateDate: invoiceDate.value ?? DateTime.now(),
+        candidateGross: grossAmount.value,
+        candidateVat: vatAmount.value,
+        candidateType: selectedInvoiceType.value ?? 'purchase',
+        ignoreDocId: currentDocId,
       );
+      if (duplicateReason != null) {
+        SnackbarService.to.showError('duplicate_title'.tr, duplicateReason);
+        return;
+      }
 
       // Otherwise, update existing invoice
       // Recalculate risks before saving
       final tempInvoice = Invoice(
         id: invoiceNumberController.text,
         supplierName: supplierController.text,
-        category: selectedCategory.value.isNotEmpty ? selectedCategory.value : invoice.category,
+        invoiceType: selectedInvoiceType.value ?? 'purchase',
+        category:
+            selectedCategory.value.isNotEmpty
+                ? selectedCategory.value
+                : invoice.category,
         date: invoiceDate.value ?? DateTime.now(),
+        netAmount: netAmount.value,
         grossAmount: grossAmount.value,
         vatAmount: vatAmount.value,
         additionalCharges: additionalCharges.value,
@@ -1011,7 +1231,10 @@ class InvoiceDetailsController extends GetxController {
       List<InvoiceRisk> updatedRisks = [];
       if (Get.isRegistered<InvoiceListController>()) {
         final listController = Get.find<InvoiceListController>();
-        updatedRisks = listController.assessInvoiceRisks(tempInvoice, allInvoices);
+        updatedRisks = listController.assessInvoiceRisks(
+          tempInvoice,
+          allInvoices,
+        );
       }
 
       // Ensure userId is set (required for security rules)
@@ -1023,34 +1246,47 @@ class InvoiceDetailsController extends GetxController {
         if (currentUser != null) {
           finalUserId = currentUser.uid;
         } else {
-          SnackbarService.to.showError(
-            'Error',
-            'You must be logged in to save invoices.',
-          );
+          SnackbarService.to.showError('error'.tr, 'must_login'.tr);
           return;
         }
       }
 
       // Read values from controllers (source of truth) to ensure we get latest user input
-      final netText = netAmountController.text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
+      final netText =
+          netAmountController.text
+              .replaceAll('AED', '')
+              .replaceAll(',', '')
+              .replaceAll(' ', '')
+              .trim();
       final netFromController = double.tryParse(netText) ?? netAmount.value;
-      
-      final additionalText = additionalChargesController.text.replaceAll('AED', '').replaceAll(',', '').replaceAll(' ', '').trim();
-      final additionalFromController = double.tryParse(additionalText) ?? additionalCharges.value;
-      
+
+      final additionalText =
+          additionalChargesController.text
+              .replaceAll('AED', '')
+              .replaceAll(',', '')
+              .replaceAll(' ', '')
+              .trim();
+      final additionalFromController =
+          double.tryParse(additionalText) ?? additionalCharges.value;
+
       // Calculate VAT from net amount
       final calculatedVat = netFromController * 0.05;
       final vatFromNet = (calculatedVat * 100).roundToDouble() / 100;
       final grossFromNet = netFromController + vatFromNet;
-      
+
       // Create updated invoice from form data with recalculated risks.
       // Note: we preserve immutable metadata like userId and imageUrl from the
       // existing `invoice` instance so that edits only touch what the user sees.
       final updatedInvoice = Invoice(
         id: invoiceNumberController.text,
         supplierName: supplierController.text,
-        category: selectedCategory.value.isNotEmpty ? selectedCategory.value : invoice.category,
+        invoiceType: selectedInvoiceType.value ?? 'purchase',
+        category:
+            selectedCategory.value.isNotEmpty
+                ? selectedCategory.value
+                : invoice.category,
         date: invoiceDate.value ?? DateTime.now(),
+        netAmount: netFromController,
         grossAmount: grossFromNet,
         vatAmount: vatFromNet,
         additionalCharges: additionalFromController,
@@ -1062,6 +1298,7 @@ class InvoiceDetailsController extends GetxController {
         dueDate: isPaid.value ? null : dueDate.value,
         userId: finalUserId,
         imageUrl: invoice.imageUrl,
+        imageFingerprint: invoice.imageFingerprint,
         firestoreDocId: invoice.firestoreDocId,
         risks: updatedRisks,
         isFlagged: invoice.isFlagged.value,
@@ -1070,36 +1307,36 @@ class InvoiceDetailsController extends GetxController {
       // Update in Firestore `user_invoices` by the known document id.
       // Priority: use firestoreDocId from invoice object, then invoiceDocId from args, then fallback to invoice.id
       final docId = invoice.firestoreDocId ?? invoiceDocId ?? invoice.id;
-      
+
       print('🔥 Invoice Details: About to update invoice in Firestore');
       print('🔥 Document ID: $docId');
       print('🔥 User ID: ${updatedInvoice.userId}');
       print('🔥 Invoice ID: ${updatedInvoice.id}');
-      
+
       try {
         final success = await _invoiceRepository.updateInvoiceByDocId(
           docId,
           updatedInvoice,
         );
-        
+
         if (success) {
           print('✅✅✅ Invoice Details: Update SUCCESSFUL ✅✅✅');
           SnackbarService.to.showSuccess(
             'title_updated'.tr,
             'msg_invoice_updated_success'.tr,
           );
-          
+
           // Trigger refresh of invoice list and dashboard
           if (Get.isRegistered<InvoiceListController>()) {
             final invoiceController = Get.find<InvoiceListController>();
             await invoiceController.refreshInvoices();
           }
-          
+
           if (Get.isRegistered<DashboardController>()) {
             final dashboardController = Get.find<DashboardController>();
             dashboardController.loadDashboardData();
           }
-          
+
           // Reset hasChanges flag
           hasChanges.value = false;
           // Close the screen after a short delay to allow stream to update
@@ -1108,8 +1345,8 @@ class InvoiceDetailsController extends GetxController {
         } else {
           print('❌ Invoice Details: Update returned false');
           SnackbarService.to.showError(
-            'Error',
-            'Failed to save invoice. Please try again.',
+            'error'.tr,
+            'failed_to_update_invoice'.tr,
           );
         }
       } catch (updateError, updateStack) {
@@ -1131,37 +1368,58 @@ class InvoiceDetailsController extends GetxController {
       debugPrint('❌ Error Message: $e');
       debugPrint('❌ Stack Trace: $stackTrace');
       SnackbarService.to.showError(
-        'Error',
-        'Failed to save invoice: ${e.toString()}',
+        'error'.tr,
+        'failed_to_save'.trParams({'error': e.toString()}),
       );
     } finally {
       isSaving.value = false;
       print('💾 confirmAndSave: isSaving reset to false');
     }
   }
-  
+
   /// Save a new invoice (from OCR) to Firebase
   Future<void> _saveNewInvoice() async {
     try {
       // Ensure user is authenticated
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
-        SnackbarService.to.showError(
-          'Error',
-          'You must be logged in to save invoices.',
-        );
+        SnackbarService.to.showError('error'.tr, 'must_login'.tr);
         return;
       }
-      
+
+      final String? uploadedFingerprint =
+          await _computeCurrentImageFingerprint();
+
+      final duplicateReason = await _findDuplicateForCurrentUser(
+        userId: currentUser.uid,
+        candidateFingerprint: uploadedFingerprint,
+        candidateInvoiceNumber: invoiceNumberController.text,
+        candidateSupplier: supplierController.text,
+        candidateDate: invoiceDate.value ?? DateTime.now(),
+        candidateGross: grossAmount.value,
+        candidateVat: vatAmount.value,
+        candidateType: selectedInvoiceType.value ?? 'purchase',
+      );
+      if (duplicateReason != null) {
+        SnackbarService.to.showError('duplicate_title'.tr, duplicateReason);
+        return;
+      }
+
       // 1) Prepare base invoice data from current form state
       final now = DateTime.now();
       final baseInvoice = Invoice(
-        id: invoiceNumberController.text.isNotEmpty
-            ? invoiceNumberController.text
-            : 'INV-${now.millisecondsSinceEpoch}',
+        id:
+            invoiceNumberController.text.isNotEmpty
+                ? invoiceNumberController.text
+                : 'INV-${now.millisecondsSinceEpoch}',
         supplierName: supplierController.text,
-        category: selectedCategory.value.isNotEmpty ? selectedCategory.value : categories.first,
+        invoiceType: selectedInvoiceType.value ?? 'purchase',
+        category:
+            selectedCategory.value.isNotEmpty
+                ? selectedCategory.value
+                : purchaseCategories.first,
         date: invoiceDate.value ?? DateTime.now(),
+        netAmount: netAmount.value,
         grossAmount: grossAmount.value,
         vatAmount: vatAmount.value,
         additionalCharges: additionalCharges.value,
@@ -1173,6 +1431,7 @@ class InvoiceDetailsController extends GetxController {
         dueDate: isPaid.value ? null : dueDate.value,
         userId: currentUser.uid,
         imageUrl: null,
+        imageFingerprint: uploadedFingerprint,
         risks: risks.toList(),
         isFlagged: false,
       );
@@ -1190,8 +1449,11 @@ class InvoiceDetailsController extends GetxController {
         try {
           final storage = FirebaseStorage.instance;
           final storageRef = storage.ref().child(
-              'user_invoices/${currentUser.uid}/$docId.jpg');
-          print('📤 Invoice Details: Uploading image bytes to Firebase Storage at ${storageRef.fullPath}');
+            'user_invoices/${currentUser.uid}/$docId.jpg',
+          );
+          print(
+            '📤 Invoice Details: Uploading image bytes to Firebase Storage at ${storageRef.fullPath}',
+          );
           final uploadTask = await storageRef.putData(
             invoiceImageBytes!,
             SettableMetadata(contentType: 'image/jpeg'),
@@ -1208,8 +1470,11 @@ class InvoiceDetailsController extends GetxController {
         try {
           final storage = FirebaseStorage.instance;
           final storageRef = storage.ref().child(
-              'user_invoices/${currentUser.uid}/$docId.jpg');
-          print('📤 Invoice Details: Uploading image to Firebase Storage at ${storageRef.fullPath}');
+            'user_invoices/${currentUser.uid}/$docId.jpg',
+          );
+          print(
+            '📤 Invoice Details: Uploading image to Firebase Storage at ${storageRef.fullPath}',
+          );
           // On mobile, cast to dart:io File
           final ioFile = invoiceImageFile as dynamic;
           final uploadTask = await storageRef.putFile(ioFile);
@@ -1233,7 +1498,7 @@ class InvoiceDetailsController extends GetxController {
       print('🔥 Document ID: $docId');
       print('🔥 User ID: ${currentUser.uid}');
       print('🔥 Invoice ID: ${invoiceToSave.id}');
-      
+
       await docRef.set(invoiceToSave.toMap());
       print('✅✅✅ Invoice Details: Firestore write SUCCESSFUL ✅✅✅');
 
@@ -1245,9 +1510,10 @@ class InvoiceDetailsController extends GetxController {
           messageKey: 'notif_invoice_created_msg',
           messageParams: {
             'invoiceNumber': invoiceToSave.id,
-            'supplierName': invoiceToSave.supplierName.isNotEmpty 
-                ? invoiceToSave.supplierName 
-                : 'Unknown Supplier',
+            'supplierName':
+                invoiceToSave.supplierName.isNotEmpty
+                    ? invoiceToSave.supplierName
+                    : 'Unknown Supplier',
           },
           isCritical: false,
         );
@@ -1261,20 +1527,20 @@ class InvoiceDetailsController extends GetxController {
         'invoice_saved'.tr,
         'msg_invoice_saved_success'.tr,
       );
-      
+
       print('🎉 Invoice Details: Save complete');
-      
+
       // Trigger refresh of invoice list and dashboard
       if (Get.isRegistered<InvoiceListController>()) {
         final invoiceController = Get.find<InvoiceListController>();
         await invoiceController.refreshInvoices();
       }
-      
+
       if (Get.isRegistered<DashboardController>()) {
         final dashboardController = Get.find<DashboardController>();
         dashboardController.loadDashboardData();
       }
-      
+
       // Navigate back to main screen after a short delay to allow stream to update
       await Future.delayed(const Duration(milliseconds: 800));
       Get.offAllNamed('/main');
@@ -1282,19 +1548,149 @@ class InvoiceDetailsController extends GetxController {
       print('❌❌❌ Invoice Details: ERROR SAVING NEW INVOICE ❌❌❌');
       print('❌ Error: $e');
       print('❌ Stack trace: $stackTrace');
-      
-      String errorMessage = 'Failed to save invoice';
-      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
-        errorMessage = 'Firestore permission denied. Check security rules.';
-      } else if (e.toString().contains('network') || e.toString().contains('UNAVAILABLE')) {
-        errorMessage = 'Network error. Check your internet connection.';
+
+      String errorMessage = 'failed_to_save_invoice'.tr;
+      if (e.toString().contains('permission') ||
+          e.toString().contains('PERMISSION_DENIED')) {
+        errorMessage = 'firestore_permission_denied'.tr;
+      } else if (e.toString().contains('network') ||
+          e.toString().contains('UNAVAILABLE')) {
+        errorMessage = 'network_error_check_connection'.tr;
       }
-      
-      SnackbarService.to.showError(
-        'Error',
-        errorMessage,
-      );
+
+      SnackbarService.to.showError('error'.tr, errorMessage);
     }
+  }
+
+  Future<String?> _computeCurrentImageFingerprint() async {
+    try {
+      Uint8List? bytes = invoiceImageBytes;
+      if (bytes == null && invoiceImageFile != null && !kIsWeb) {
+        final ioFile = invoiceImageFile as dynamic;
+        bytes = await ioFile.readAsBytes();
+      }
+      if (bytes == null || bytes.isEmpty) return null;
+      return _computePerceptualHash(bytes);
+    } catch (e) {
+      debugPrint('Failed to compute image fingerprint: $e');
+      return null;
+    }
+  }
+
+  String _computePerceptualHash(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return '';
+    final resized = img.copyResize(decoded, width: 8, height: 8);
+    final gray = img.grayscale(resized);
+
+    final values = <int>[];
+    int sum = 0;
+    for (int y = 0; y < 8; y++) {
+      for (int x = 0; x < 8; x++) {
+        final p = gray.getPixel(x, y);
+        final v = p.r.toInt();
+        values.add(v);
+        sum += v;
+      }
+    }
+    final avg = sum / values.length;
+    final bits = values.map((v) => v >= avg ? '1' : '0').join();
+    return bits;
+  }
+
+  int _hammingDistance(String a, String b) {
+    if (a.length != b.length) return 999;
+    int diff = 0;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) diff++;
+    }
+    return diff;
+  }
+
+  Future<String?> _findDuplicateForCurrentUser({
+    required String userId,
+    required String? candidateFingerprint,
+    required String candidateInvoiceNumber,
+    required String candidateSupplier,
+    required DateTime candidateDate,
+    required double candidateGross,
+    required double candidateVat,
+    required String candidateType,
+    String? ignoreDocId,
+  }) async {
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('user_invoices')
+            .where('userId', isEqualTo: userId)
+            .limit(500)
+            .get();
+
+    final normalizedNumber = candidateInvoiceNumber.trim().toLowerCase();
+    final normalizedSupplier = candidateSupplier.trim().toLowerCase();
+    final normalizedType = candidateType.trim().toLowerCase();
+    final DateTime normalizedDate = DateTime(
+      candidateDate.year,
+      candidateDate.month,
+      candidateDate.day,
+    );
+
+    for (final doc in snapshot.docs) {
+      if (ignoreDocId != null &&
+          ignoreDocId.isNotEmpty &&
+          doc.id == ignoreDocId) {
+        continue;
+      }
+      final data = doc.data();
+
+      // Priority 0: strict duplicate invoice number
+      final existingNumber = (data['id'] as String? ?? '').trim().toLowerCase();
+      if (normalizedNumber.isNotEmpty && existingNumber == normalizedNumber) {
+        return 'duplicate_invoice_number_msg'.tr;
+      }
+
+      // Priority 1: image fingerprint duplicate
+      final existingFingerprint = (data['imageFingerprint'] as String?) ?? '';
+      if ((candidateFingerprint ?? '').isNotEmpty &&
+          existingFingerprint.isNotEmpty) {
+        final distance = _hammingDistance(
+          candidateFingerprint!,
+          existingFingerprint,
+        );
+        if (distance <= 3) {
+          return 'duplicate_image_detected_msg'.tr;
+        }
+      }
+
+      // Priority 2: strict detail match fallback
+      final existingSupplier =
+          (data['supplierName'] as String? ?? '').trim().toLowerCase();
+      final existingType =
+          (data['invoiceType'] as String? ?? 'purchase').trim().toLowerCase();
+      final existingDateRaw = data['date'];
+      final existingGross = (data['grossAmount'] as num?)?.toDouble() ?? 0.0;
+      final existingVat = (data['vatAmount'] as num?)?.toDouble() ?? 0.0;
+
+      DateTime? existingDate;
+      if (existingDateRaw is Timestamp) {
+        final d = existingDateRaw.toDate();
+        existingDate = DateTime(d.year, d.month, d.day);
+      }
+
+      final strictMatch =
+          existingNumber == normalizedNumber &&
+          existingSupplier == normalizedSupplier &&
+          existingType == normalizedType &&
+          existingDate != null &&
+          existingDate.isAtSameMomentAs(normalizedDate) &&
+          (existingGross - candidateGross).abs() < 0.01 &&
+          (existingVat - candidateVat).abs() < 0.01;
+
+      if (strictMatch) {
+        return 'duplicate_invoice_detected_msg'.tr;
+      }
+    }
+
+    return null;
   }
 
   /// Determine invoice status based on payment status
@@ -1314,12 +1710,13 @@ class InvoiceDetailsController extends GetxController {
       return 'Pending';
     }
   }
-  
+
   /// Select due date (called from UI)
   Future<void> selectDueDate() async {
     final picked = await showDatePicker(
       context: Get.context!,
-      initialDate: dueDate.value ?? DateTime.now().add(const Duration(days: 30)),
+      initialDate:
+          dueDate.value ?? DateTime.now().add(const Duration(days: 30)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );

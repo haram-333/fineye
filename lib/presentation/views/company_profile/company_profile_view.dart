@@ -1,7 +1,8 @@
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/format_helper.dart';
 import '../../controllers/company_profile_controller.dart';
 import '../../../core/constants/app_colors.dart';
 
@@ -55,7 +56,7 @@ class CompanyProfileView extends GetView<CompanyProfileController> {
       elevation: 0,
        flexibleSpace: ClipRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(color: Colors.transparent),
         ),
       ),
@@ -155,7 +156,7 @@ class CompanyProfileView extends GetView<CompanyProfileController> {
           const SizedBox(height: 20),
           _buildTextField('${'company_name_label'.tr} *', controller.companyNameController),
           const SizedBox(height: 16),
-          _buildTextField('${'company_email_label'.tr} *', controller.emailController, keyboardType: TextInputType.emailAddress, textDirection: TextDirection.ltr),
+          _buildTextField('${'company_email_label'.tr} *', controller.emailController, keyboardType: TextInputType.emailAddress, textDirection: ui.TextDirection.ltr),
           const SizedBox(height: 16),
           // Phone Number with Country Code
           Column(
@@ -163,67 +164,70 @@ class CompanyProfileView extends GetView<CompanyProfileController> {
             children: [
               Text('${'phone_label'.tr} *', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.ink)),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  // Country Code Field
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: controller.countryCodeController,
-                      keyboardType: TextInputType.phone,
-                      textDirection: TextDirection.ltr,
-                      style: const TextStyle(fontSize: 15, color: AppColors.ink),
-                      decoration: InputDecoration(
-                        hintText: '+971',
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        filled: true,
-                        fillColor: const Color(0xFFFaFaFa),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Phone Number Field
-                  Expanded(
-                    child: TextField(
-                      controller: controller.phoneController,
-                      keyboardType: TextInputType.phone,
-                      textDirection: TextDirection.ltr,
-                      style: const TextStyle(fontSize: 15, color: AppColors.ink),
-                      decoration: InputDecoration(
-                        hintText: 'phone_hint_uae'.tr,
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        filled: true,
-                        fillColor: const Color(0xFFFaFaFa),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+              Directionality(
+                textDirection: ui.TextDirection.ltr,
+                child: Row(
+                  children: [
+                    // Country Code Field
+                    SizedBox(
+                      width: 100,
+                      child: TextField(
+                        controller: controller.countryCodeController,
+                        keyboardType: TextInputType.phone,
+                        textDirection: ui.TextDirection.ltr,
+                        style: const TextStyle(fontSize: 15, color: AppColors.ink),
+                        decoration: InputDecoration(
+                          hintText: '+971',
+                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          filled: true,
+                          fillColor: const Color(0xFFFaFaFa),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    // Phone Number Field
+                    Expanded(
+                      child: TextField(
+                        controller: controller.phoneController,
+                        keyboardType: TextInputType.phone,
+                        textDirection: ui.TextDirection.ltr,
+                        style: const TextStyle(fontSize: 15, color: AppColors.ink),
+                        decoration: InputDecoration(
+                          hintText: 'phone_hint_uae'.tr,
+                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          filled: true,
+                          fillColor: const Color(0xFFFaFaFa),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -483,9 +487,12 @@ class CompanyProfileView extends GetView<CompanyProfileController> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Obx(() => Text(
-                   DateFormat('dd MMM yyyy').format(date.value),
-                   style: const TextStyle(fontSize: 15, color: AppColors.ink),
+                Obx(() => Directionality(
+                  textDirection: ui.TextDirection.ltr,
+                  child: Text(
+                     FormatHelper.date(date.value),
+                     style: const TextStyle(fontSize: 15, color: AppColors.ink),
+                  ),
                 )),
                 const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.grey),
               ],

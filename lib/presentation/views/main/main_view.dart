@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -75,7 +76,7 @@ class MainView extends GetView<MainController> {
               right: 0, 
               bottom: 0,
               child: Directionality(
-                textDirection: TextDirection.ltr,
+                textDirection: ui.TextDirection.ltr,
                 child: Obx(() => BottomNav(
                   currentIndex: controller.currentIndex.value,
                   onTap: controller.changeTabIndex,

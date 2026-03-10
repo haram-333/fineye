@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, compute;
 import 'package:get/get.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdfx/pdfx.dart';
@@ -22,6 +22,7 @@ import 'package:gal/gal.dart' if (dart.library.html) 'package:fineye/presentatio
 import 'dart:io' show File if (dart.library.html) 'package:fineye/presentation/controllers/file_stub.dart' show File;
 
 class ImagePreprocessingController extends GetxController {
+  bool _isClosed = false;
   // File and image state
   final originalFile = Rx<File?>(null);
   final originalImageBytes = Rx<Uint8List?>(null);
@@ -99,7 +100,9 @@ class ImagePreprocessingController extends GetxController {
         timer.cancel();
         // Complete with pop-out animation - delay to show completion
         Future.delayed(const Duration(milliseconds: 500), () {
-          showUxLoading.value = false; // This will trigger unblur
+          if (!_isClosed) {
+            showUxLoading.value = false; // This will trigger unblur
+          }
         });
         return;
       }
@@ -120,6 +123,7 @@ class ImagePreprocessingController extends GetxController {
   
   @override
   void onClose() {
+    _isClosed = true;
     _uxLoadingTimer?.cancel();
     _preprocessingDebounceTimer?.cancel();
     // Clean up resources
@@ -191,18 +195,18 @@ class ImagePreprocessingController extends GetxController {
       }
 
       if (originalImageBytes.value != null) {
-        // Decode image to get dimensions
-        final decoded = img.decodeImage(originalImageBytes.value!);
-        if (decoded != null) {
-          imageWidth.value = decoded.width;
-          imageHeight.value = decoded.height;
+        // Decode image to get dimensions in background
+        final bytes = originalImageBytes.value!;
+        final dimensions = await compute(_getImageDimensions, bytes);
+        if (dimensions != null) {
+          imageWidth.value = dimensions.width;
+          imageHeight.value = dimensions.height;
         }
         
         // Reset unsaved crop changes when new image is loaded
         hasUnsavedCropChanges.value = false;
         
         // Show image immediately, then process in background
-        // This makes the UI more responsive
         isLoading.value = false;
         
         // Apply preprocessing asynchronously without blocking UI
@@ -253,10 +257,10 @@ class ImagePreprocessingController extends GetxController {
       if (pageImage != null) {
         // PdfPageImage.bytes is already Uint8List
         originalImageBytes.value = pageImage.bytes;
-        final decoded = img.decodeImage(pageImage.bytes);
-        if (decoded != null) {
-          imageWidth.value = decoded.width;
-          imageHeight.value = decoded.height;
+        final dimensions = await compute(_getImageDimensions, pageImage.bytes);
+        if (dimensions != null) {
+          imageWidth.value = dimensions.width;
+          imageHeight.value = dimensions.height;
         }
       }
 
@@ -283,20 +287,12 @@ class ImagePreprocessingController extends GetxController {
         originalImageBytes.value = bytes;
       }
 
-      // Get dimensions asynchronously to prevent UI blocking
-      // Decode in a separate microtask to avoid blocking
-      await Future.microtask(() {
-        try {
-          final decoded = img.decodeImage(bytes);
-          if (decoded != null) {
-            imageWidth.value = decoded.width;
-            imageHeight.value = decoded.height;
-          }
-        } catch (e) {
-          // If decoding fails, dimensions will remain 0
-          debugPrint('Error getting image dimensions: $e');
-        }
-      });
+      // Get dimensions in background
+      final dimensions = await compute(_getImageDimensions, bytes);
+      if (dimensions != null) {
+        imageWidth.value = dimensions.width;
+        imageHeight.value = dimensions.height;
+      }
     } catch (e) {
       throw Exception('Failed to load image: $e');
     }
@@ -312,21 +308,10 @@ class ImagePreprocessingController extends GetxController {
       // This prevents stuck loading when image loads quickly
       processingMessage.value = 'processing_image'.tr;
 
-      // Decode image - preserve original resolution to prevent pixelation
-      img.Image? processed = img.decodeImage(originalImageBytes.value!);
+      // Decode and resize in background isolate
+      final result = await compute(_decodeAndResizeImage, originalImageBytes.value!);
+      img.Image? processed = result;
       if (processed == null) return;
-
-      // Balance quality and performance: use 2500px for preview processing
-      // This prevents pixelation while keeping processing fast enough for real-time updates
-      // Final output in applyAndContinue uses full resolution
-      final maxDimension = 2500;
-      if (processed.width > maxDimension || processed.height > maxDimension) {
-        if (processed.width > processed.height) {
-          processed = img.copyResize(processed, width: maxDimension);
-        } else {
-          processed = img.copyResize(processed, height: maxDimension);
-        }
-      }
 
       // Apply preprocessing steps in order
       // IMPORTANT: Don't auto-detect edges when crop handles are shown (user is manually adjusting)
@@ -374,8 +359,7 @@ class ImagePreprocessingController extends GetxController {
         processed = await _binarize(processed);
       }
 
-      // Encode processed image with high quality to preserve text clarity
-      // Only encode if we actually processed something
+      // Encode processed image in background
       final hasProcessing = enableGrayscale.value ||
           enableContrastEnhancement.value ||
           enableNoiseReduction.value ||
@@ -383,10 +367,8 @@ class ImagePreprocessingController extends GetxController {
           enableBinarization.value;
       
       if (hasProcessing) {
-        // Use JPEG with quality 95 to preserve text clarity and prevent compression artifacts
-        preprocessedImageBytes.value = Uint8List.fromList(
-          img.encodeJpg(processed, quality: 95),
-        );
+        processingMessage.value = 'lbl_step_finalizing'.tr;
+        preprocessedImageBytes.value = await compute(_encodeJpgImage, processed);
       } else {
         // No processing applied, use original
         preprocessedImageBytes.value = originalImageBytes.value;
@@ -928,16 +910,16 @@ class ImagePreprocessingController extends GetxController {
     // Show confirmation dialog
     final result = await Get.dialog<bool>(
       AlertDialog(
-        title: const Text('Save to Gallery'),
-        content: const Text('Do you want to save the current image to your gallery?'),
+        title: Text('dialog_save_to_gallery_title'.tr),
+        content: Text('dialog_save_to_gallery_message'.tr),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
-            child: const Text('Cancel'),
+            child: Text('btn_cancel'.tr),
           ),
           TextButton(
             onPressed: () => Get.back(result: true),
-            child: const Text('Yes'),
+            child: Text('lbl_yes'.tr),
           ),
         ],
       ),
@@ -950,7 +932,7 @@ class ImagePreprocessingController extends GetxController {
     
     try {
       isLoading.value = true;
-      processingMessage.value = 'Saving to gallery...';
+      processingMessage.value = 'msg_saving_to_gallery'.tr;
       
       // Determine which image to save
       Uint8List? imageBytes;
@@ -969,8 +951,8 @@ class ImagePreprocessingController extends GetxController {
       
       if (imageBytes == null) {
         SnackbarService.to.showError(
-          'Error',
-          'No image available to save',
+          'title_error'.tr,
+          'msg_no_image_to_save'.tr,
         );
         activeButton.value = 'none';
         isLoading.value = false;
@@ -985,8 +967,8 @@ class ImagePreprocessingController extends GetxController {
         activeButton.value = 'none';
         
         SnackbarService.to.showInfo(
-          'Info',
-          'Please use your browser\'s save image feature (right-click > Save image)',
+          'title_info'.tr,
+          'msg_use_browser_save'.tr,
           duration: const Duration(seconds: 3),
         );
       } else {
@@ -1000,8 +982,8 @@ class ImagePreprocessingController extends GetxController {
         activeButton.value = 'none';
         
         SnackbarService.to.showSuccess(
-          'Success',
-          'Image saved to gallery',
+          'title_success'.tr,
+          'msg_image_saved_gallery'.tr,
           duration: const Duration(seconds: 2),
         );
       }
@@ -1009,8 +991,8 @@ class ImagePreprocessingController extends GetxController {
       isLoading.value = false;
       activeButton.value = 'none';
       SnackbarService.to.showError(
-        'Error',
-        'Failed to save image: $e',
+        'title_error'.tr,
+        'msg_failed_save_image'.tr,
       );
     }
   }
@@ -1025,17 +1007,17 @@ class ImagePreprocessingController extends GetxController {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        title: const Text(
-          'Save Changes?',
-          style: TextStyle(
+        title: Text(
+          'dialog_save_changes_title'.tr,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: AppColors.ink,
           ),
         ),
-        content: const Text(
-          'You have unsaved crop changes. Do you want to save them before continuing?',
-          style: TextStyle(
+        content: Text(
+          'dialog_save_changes_message'.tr,
+          style: const TextStyle(
             fontSize: 14,
             color: AppColors.mutedText,
           ),
@@ -1044,9 +1026,9 @@ class ImagePreprocessingController extends GetxController {
           // Cancel button
           TextButton(
             onPressed: () => Get.back(result: null),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
+            child: Text(
+              'btn_cancel'.tr,
+              style: const TextStyle(
                 color: AppColors.mutedText,
               ),
             ),
@@ -1055,9 +1037,9 @@ class ImagePreprocessingController extends GetxController {
           // Don't Save button
           TextButton(
             onPressed: () => Get.back(result: false),
-            child: const Text(
-              'Don\'t Save',
-              style: TextStyle(
+            child: Text(
+              'btn_dont_save'.tr,
+              style: const TextStyle(
                 color: AppColors.ink,
               ),
             ),
@@ -1072,9 +1054,9 @@ class ImagePreprocessingController extends GetxController {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text(
-              'Save Changes',
-              style: TextStyle(
+            child: Text(
+              'btn_save_changes'.tr,
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
@@ -1105,8 +1087,8 @@ class ImagePreprocessingController extends GetxController {
       // hasUnsavedCropChanges is set to false in handleCroppedImage
     } catch (e) {
       SnackbarService.to.showError(
-        'Error',
-        'Failed to save crop changes: $e',
+        'title_error'.tr,
+        'msg_failed_save_crop'.tr,
       );
     }
   }
@@ -1373,6 +1355,49 @@ class ImagePreprocessingController extends GetxController {
     }
   }
 
+  // Static helper methods for background isolates
+  static _ImageDimensions? _getImageDimensions(Uint8List bytes) {
+    try {
+      final decoded = img.decodeImage(bytes);
+      if (decoded != null) {
+        return _ImageDimensions(decoded.width, decoded.height);
+      }
+    } catch (e) {
+      debugPrint('Error getting image dimensions in isolate: $e');
+    }
+    return null;
+  }
+
+  static img.Image? _decodeAndResizeImage(Uint8List bytes) {
+    try {
+      img.Image? processed = img.decodeImage(bytes);
+      if (processed == null) return null;
+
+      // Balance quality and performance: use 2500px for preview processing
+      final maxDimension = 2500;
+      if (processed.width > maxDimension || processed.height > maxDimension) {
+        if (processed.width > processed.height) {
+          processed = img.copyResize(processed, width: maxDimension);
+        } else {
+          processed = img.copyResize(processed, height: maxDimension);
+        }
+      }
+      return processed;
+    } catch (e) {
+      debugPrint('Error decoding image in isolate: $e');
+      return null;
+    }
+  }
+
+  static Uint8List _encodeJpgImage(img.Image image) {
+    return Uint8List.fromList(img.encodeJpg(image, quality: 95));
+  }
+}
+
+class _ImageDimensions {
+  final int width;
+  final int height;
+  _ImageDimensions(this.width, this.height);
 }
 
 

@@ -127,7 +127,7 @@ class AboutView extends GetView<AboutController> {
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: controller.loadData,
-                  child: const Text('Retry'),
+                  child: Text('retry'.tr),
                 ),
               ],
             ),

@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_routes.dart';
 import '../../controllers/help_support_controller.dart';
 
 class HelpSupportView extends GetView<HelpSupportController> {
@@ -10,7 +9,6 @@ class HelpSupportView extends GetView<HelpSupportController> {
 
   @override
   Widget build(BuildContext context) {
-    // Ensure controller is loaded
     if (!Get.isRegistered<HelpSupportController>()) {
       Get.put(HelpSupportController());
     }
@@ -30,49 +28,13 @@ class HelpSupportView extends GetView<HelpSupportController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'faq_section'.tr,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.mutedText,
-                      ),
-                    ),
+                    _buildSectionTitle('FAQ'),
                     const SizedBox(height: 12),
                     _buildFAQSection(),
-                    
-                    const SizedBox(height: 8),
-                    Text(
-                      'help_footer'.tr,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-
                     const SizedBox(height: 24),
-                    Text(
-                      'contact_section'.tr,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.mutedText,
-                      ),
-                    ),
+                    _buildSectionTitle('Support'),
                     const SizedBox(height: 12),
                     _buildContactSection(),
-
-                    const SizedBox(height: 24),
-                    Text(
-                      'legal_section'.tr,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.mutedText,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLegalSection(),
                   ],
                 ),
               ),
@@ -118,8 +80,8 @@ class HelpSupportView extends GetView<HelpSupportController> {
                 color: AppColors.ink,
               ),
             ),
-             const SizedBox(height: 4),
-             Text(
+            const SizedBox(height: 4),
+            Text(
               'help_subtitle'.tr,
               style: const TextStyle(
                 fontSize: 13,
@@ -134,7 +96,132 @@ class HelpSupportView extends GetView<HelpSupportController> {
     );
   }
 
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        color: AppColors.mutedText,
+      ),
+    );
+  }
+
   Widget _buildFAQSection() {
+    final sections = <_FAQSection>[
+      _FAQSection(
+        title: 'GETTING STARTED',
+        items: [
+          _FAQItem(
+            question: 'What is FinEye?',
+            answer:
+                'FinEye is a VAT organization and tracking tool designed to help UAE businesses manage invoices and monitor VAT amounts.',
+          ),
+          _FAQItem(
+            question: 'How do I get started with FinEye?',
+            answer:
+                'Complete your company setup, then upload your first invoice and classify it correctly as Sales or Purchase.',
+          ),
+          _FAQItem(
+            question:
+                'Is FinEye officially connected to the Federal Tax Authority (FTA)?',
+            answer:
+                'No. FinEye is an independent VAT management tool and is not officially connected to the FTA.',
+          ),
+          _FAQItem(
+            question: 'Does FinEye submit tax returns?',
+            answer:
+                'No. VAT returns must be submitted through the official FTA portal.',
+          ),
+        ],
+      ),
+      _FAQSection(
+        title: 'INVOICES',
+        items: [
+          _FAQItem(
+            question: 'How do I upload an invoice?',
+            answer:
+                'Tap "Upload Invoice," review the extracted data, classify the invoice, then confirm and save.',
+          ),
+          _FAQItem(
+            question: 'Can I edit an invoice after uploading?',
+            answer:
+                'Yes. You can edit or delete invoices at any time from the invoice list.',
+          ),
+          _FAQItem(
+            question: 'What is the difference between Sales and Purchase?',
+            answer:
+                'Sales are invoices you issue to customers. Purchase invoices are bills you receive from suppliers.',
+          ),
+          _FAQItem(
+            question: 'When should I select Sales - Output VAT?',
+            answer: 'Select this when you are charging VAT to your customer.',
+          ),
+          _FAQItem(
+            question: 'When should I select Purchase - Input VAT?',
+            answer: 'Select this when you have paid VAT to a supplier.',
+          ),
+          _FAQItem(
+            question: 'What does VAT Inclusive mean?',
+            answer:
+                'The entered amount already includes VAT. The system extracts the VAT portion automatically.',
+          ),
+          _FAQItem(
+            question: 'What does VAT Exclusive mean?',
+            answer:
+                'The entered amount does not include VAT. The system adds 5% VAT automatically.',
+          ),
+          _FAQItem(
+            question: 'What is Net Amount?',
+            answer: 'Net Amount is the base value before VAT is applied.',
+          ),
+          _FAQItem(
+            question: 'What is the difference between VAT and Final Total?',
+            answer:
+                'VAT is the tax amount only. Final Total is the full amount including VAT.',
+          ),
+          _FAQItem(
+            question: 'What happens if I upload a duplicate invoice?',
+            answer:
+                'The system detects duplicate invoice numbers and prevents saving to protect VAT accuracy.',
+          ),
+          _FAQItem(
+            question: 'What does CT Deductible mean?',
+            answer:
+                'It indicates whether the expense may be deductible for Corporate Tax purposes. It does not affect VAT calculation.',
+          ),
+        ],
+      ),
+      _FAQSection(
+        title: 'VAT & DASHBOARD',
+        items: [
+          _FAQItem(
+            question: 'How is Net VAT calculated?',
+            answer: 'Net VAT = Output VAT - Input VAT.',
+          ),
+          _FAQItem(
+            question: 'What does "Payable" mean?',
+            answer: 'It means you owe VAT to the tax authority.',
+          ),
+          _FAQItem(
+            question: 'What does "Credit" mean?',
+            answer:
+                'It means you have paid more VAT than collected and may carry forward or request a refund.',
+          ),
+          _FAQItem(
+            question: 'Are VAT amounts final?',
+            answer:
+                'VAT amounts are calculated automatically based on recorded invoices. You should review them before submitting your official VAT return.',
+          ),
+          _FAQItem(
+            question: 'How are VAT deadlines calculated?',
+            answer:
+                'Deadlines are based on your selected VAT filing frequency (monthly or quarterly).',
+          ),
+        ],
+      ),
+    ];
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -150,37 +237,17 @@ class HelpSupportView extends GetView<HelpSupportController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Getting Started
-          _buildFAQGroupHeader('faq_cat_getting_started'.tr),
-          _buildFAQItem('faq_q_getting_started_1'.tr, 'faq_a_getting_started_1'.tr, showDivider: true),
-
-          // 2. General
-          _buildFAQGroupHeader('faq_cat_general'.tr),
-          _buildFAQItem('faq_q_general_1'.tr, 'faq_a_general_1'.tr, showDivider: true),
-          _buildFAQItem('faq_q_general_2'.tr, 'faq_a_general_2'.tr, showDivider: true),
-
-          // 3. Invoices
-          _buildFAQGroupHeader('faq_cat_invoices'.tr),
-          _buildFAQItem('faq_q1'.tr, 'faq_a1'.tr, showDivider: true), // Existing: Upload
-          _buildFAQItem('faq_q_invoices_2'.tr, 'faq_a_invoices_2'.tr, showDivider: true), // New: Edit
-
-          // 4. Compliance Status
-          _buildFAQGroupHeader('faq_cat_compliance'.tr),
-          _buildFAQItem('faq_q_compliance_1'.tr, 'faq_a_compliance_1'.tr, showDivider: true),
-          _buildFAQItem('faq_q_compliance_2'.tr, 'faq_a_compliance_2'.tr, showDivider: true),
-
-          // 5. VAT
-          _buildFAQGroupHeader('faq_cat_vat'.tr),
-          _buildFAQItem('faq_q_vat_1'.tr, 'faq_a_vat_1'.tr, showDivider: true),
-          _buildFAQItem('faq_q2'.tr, 'faq_a2'.tr, showDivider: true), // Existing: Deadlines
-
-          // 6. Corporate Tax
-          _buildFAQGroupHeader('faq_cat_ct'.tr),
-          _buildFAQItem('faq_q_ct_1'.tr, 'faq_a_ct_1'.tr, showDivider: true),
-          
-          // 7. Security
-          _buildFAQGroupHeader('faq_cat_security'.tr),
-          _buildFAQItem('faq_q_security_1'.tr, 'faq_a_security_1'.tr, showDivider: false),
+          for (int i = 0; i < sections.length; i++) ...[
+            _buildFAQGroupHeader(sections[i].title),
+            for (int j = 0; j < sections[i].items.length; j++)
+              _buildFAQItem(
+                sections[i].items[j].question,
+                sections[i].items[j].answer,
+                showDivider:
+                    !(i == sections.length - 1 &&
+                        j == sections[i].items.length - 1),
+              ),
+          ],
         ],
       ),
     );
@@ -190,7 +257,7 @@ class HelpSupportView extends GetView<HelpSupportController> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
-        title.toUpperCase(),
+        title,
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -201,7 +268,11 @@ class HelpSupportView extends GetView<HelpSupportController> {
     );
   }
 
-  Widget _buildFAQItem(String question, String answer, {bool showDivider = false}) {
+  Widget _buildFAQItem(
+    String question,
+    String answer, {
+    bool showDivider = false,
+  }) {
     return Column(
       children: [
         ExpansionTile(
@@ -214,7 +285,10 @@ class HelpSupportView extends GetView<HelpSupportController> {
             ),
           ),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          expandedAlignment: Get.locale?.languageCode == 'ar' ? Alignment.topRight : Alignment.topLeft,
+          expandedAlignment:
+              Get.locale?.languageCode == 'ar'
+                  ? Alignment.topRight
+                  : Alignment.topLeft,
           shape: const Border(),
           collapsedShape: const Border(),
           iconColor: AppColors.primaryBlue,
@@ -231,7 +305,12 @@ class HelpSupportView extends GetView<HelpSupportController> {
           ],
         ),
         if (showDivider)
-          Divider(height: 1, indent: 16, endIndent: 16, color: Colors.grey.shade100),
+          Divider(
+            height: 1,
+            indent: 16,
+            endIndent: 16,
+            color: Colors.grey.shade100,
+          ),
       ],
     );
   }
@@ -254,19 +333,30 @@ class HelpSupportView extends GetView<HelpSupportController> {
           ListTile(
             leading: const CircleAvatar(
               backgroundColor: Color(0xFFF0F2F5),
-              child: Icon(Icons.email_outlined, color: AppColors.primaryBlue, size: 20),
+              child: Icon(
+                Icons.email_outlined,
+                color: AppColors.primaryBlue,
+                size: 20,
+              ),
             ),
             title: Text(
               'email_support'.tr,
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.ink,
+              ),
             ),
             subtitle: Text(
               'email_desc'.tr,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
-            trailing: Text(
-              'support@fineye.ai', // Or 'Link' icon
-              style: const TextStyle(fontSize: 12, color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
+            trailing: const Text(
+              'support@fineye.ai',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.primaryBlue,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             onTap: controller.sendEmail,
           ),
@@ -274,61 +364,49 @@ class HelpSupportView extends GetView<HelpSupportController> {
           ListTile(
             leading: const CircleAvatar(
               backgroundColor: Color(0xFFF0F2F5),
-              child: Icon(Icons.chat_bubble_outline, color: AppColors.primaryBlue, size: 20),
+              child: Icon(
+                Icons.bug_report_outlined,
+                color: AppColors.primaryBlue,
+                size: 20,
+              ),
             ),
             title: Text(
-              'whatsapp_support'.tr,
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
+              'report_bug'.tr,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.ink,
+              ),
             ),
             subtitle: Text(
-              'whatsapp_desc'.tr,
+              'report_bug_desc'.tr,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
             trailing: Text(
-              'open_chat'.tr,
-              style: const TextStyle(fontSize: 12, color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
+              'send'.tr,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.primaryBlue,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            onTap: controller.openWhatsApp,
+            onTap: controller.reportBug,
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildLegalSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          ListTile(
-            title: Text(
-              'privacy_policy'.tr,
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            onTap: () => Get.toNamed(AppRoutes.privacyPolicy),
-          ),
-          const Divider(height: 1, indent: 16, endIndent: 0),
-          ListTile(
-            title: Text(
-              'terms_conditions'.tr,
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            onTap: () => Get.toNamed(AppRoutes.termsConditions),
-          ),
-        ],
-      ),
-    );
-  }
+class _FAQSection {
+  final String title;
+  final List<_FAQItem> items;
+
+  _FAQSection({required this.title, required this.items});
+}
+
+class _FAQItem {
+  final String question;
+  final String answer;
+
+  _FAQItem({required this.question, required this.answer});
 }

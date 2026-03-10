@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/format_helper.dart';
 import '../../controllers/tax_settings_controller.dart';
 
 class TaxSettingsView extends GetView<TaxSettingsController> {
@@ -264,7 +265,7 @@ class TaxSettingsView extends GetView<TaxSettingsController> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                DateFormat('dd MMM yyyy').format(controller.nextVatFilingDate),
+                FormatHelper.date(controller.nextVatFilingDate),
                 style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
               ),
               Text(
@@ -275,7 +276,7 @@ class TaxSettingsView extends GetView<TaxSettingsController> {
           ),
           const SizedBox(height: 4),
           Text(
-            '${DateFormat('dd MMM yyyy').format(controller.nextVatFilingDate)} • ${controller.vatDueText}',
+            '${FormatHelper.date(controller.nextVatFilingDate)} • ${controller.vatDueText}',
             style: const TextStyle(fontSize: 13, color: AppColors.ink),
           ),
           const SizedBox(height: 16),
@@ -362,7 +363,7 @@ class TaxSettingsView extends GetView<TaxSettingsController> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                DateFormat('dd MMM yyyy').format(controller.nextCtPaymentDate),
+                FormatHelper.date(controller.nextCtPaymentDate),
                 style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
               ),
               Text(
@@ -373,7 +374,7 @@ class TaxSettingsView extends GetView<TaxSettingsController> {
           ),
           const SizedBox(height: 4),
           Text(
-            '${DateFormat('dd MMM yyyy').format(controller.nextCtPaymentDate)} • ${controller.ctDueText}',
+            '${FormatHelper.date(controller.nextCtPaymentDate)} • ${controller.ctDueText}',
             style: const TextStyle(fontSize: 13, color: AppColors.ink),
           ),
           const SizedBox(height: 16),
@@ -474,7 +475,7 @@ class TaxSettingsView extends GetView<TaxSettingsController> {
                   ],
                 ),
                 Text(
-                  DateFormat('dd MMM yyyy').format(controller.nextCtPaymentDate),
+                  FormatHelper.date(controller.nextCtPaymentDate),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
              ],
@@ -642,7 +643,7 @@ class TaxSettingsView extends GetView<TaxSettingsController> {
                    ],
                    const SizedBox(height: 4),
                    Obx(() => Text(
-                     DateFormat('dd MMM yyyy').format(date.value),
+                     FormatHelper.date(date.value),
                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                    )),
                 ],

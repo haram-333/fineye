@@ -142,8 +142,8 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
             constraints: const BoxConstraints(),
           ),
           const Spacer(),
-          const Text(
-            'Preview',
+          Text(
+            'preview_title'.tr,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -172,8 +172,8 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Preview & Preprocess',
+          Text(
+            'preview_title_rich'.tr,
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -182,7 +182,7 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Review and enhance your document',
+            'preview_subtitle'.tr,
             style: TextStyle(
               fontSize: 12,
               color: AppColors.mutedText,
@@ -305,7 +305,7 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Extracting invoice details...',
+                              'msg_extracting_details'.tr,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -345,9 +345,9 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildProgressStep('Uploading', 0),
-                          _buildProgressStep('Reading totals', 1),
-                          _buildProgressStep('Final checks', 2),
+                          _buildProgressStep('lbl_step_uploading'.tr, 0),
+                          _buildProgressStep('lbl_step_reading'.tr, 1),
+                          _buildProgressStep('lbl_step_finalizing'.tr, 2),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -355,11 +355,11 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
                       Obx(() {
                         String detail = '';
                         if (controller.uxLoadingStep.value == 0) {
-                          detail = 'Uploading invoice file...';
+                          detail = 'msg_step_uploading_detail'.tr;
                         } else if (controller.uxLoadingStep.value == 1) {
-                          detail = 'Reading totals, VAT, and supplier info';
+                          detail = 'msg_step_reading_detail'.tr;
                         } else {
-                          detail = 'Performing final validation checks';
+                          detail = 'msg_step_finalizing_detail'.tr;
                         }
                         return Align(
                           alignment: Alignment.centerLeft,
@@ -608,8 +608,8 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
           controller.originalImageBytes.value;
 
       if (originalBytes == null || processedBytes == null) {
-        return const Center(
-          child: Text('No image available'),
+        return Center(
+          child: Text('msg_no_image_available'.tr),
         );
       }
 
@@ -750,49 +750,49 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
                     _buildSettingToggle(
                       'edge_detection',
                       'edge_detection'.tr,
-                      'Detect document edges automatically',
+                      'msg_edge_detection_desc'.tr,
                       controller.enableEdgeDetection.value,
                       Icons.crop_free,
                     ),
                     _buildSettingToggle(
                       'auto_crop',
                       'auto_crop'.tr,
-                      'Automatically crop to document boundaries',
+                      'msg_auto_crop_desc'.tr,
                       controller.enableAutoCrop.value,
                       Icons.crop,
                     ),
                     _buildSettingToggle(
                       'perspective_correction',
                       'perspective_correction'.tr,
-                      'Correct perspective distortion',
+                      'msg_perspective_desc'.tr,
                       controller.enablePerspectiveCorrection.value,
                       Icons.transform,
                     ),
                     _buildSettingToggle(
                       'grayscale',
                       'grayscale_conversion'.tr,
-                      'Convert to grayscale for better contrast',
+                      'msg_grayscale_desc'.tr,
                       controller.enableGrayscale.value,
                       Icons.invert_colors,
                     ),
                     _buildSettingToggle(
                       'contrast_enhancement',
                       'contrast_enhancement'.tr,
-                      'Enhance contrast using adaptive histogram',
+                      'msg_contrast_desc'.tr,
                       controller.enableContrastEnhancement.value,
                       Icons.contrast,
                     ),
                     _buildSettingToggle(
                       'noise_reduction',
                       'noise_reduction'.tr,
-                      'Reduce image noise and artifacts',
+                      'msg_noise_reduction_desc'.tr,
                       controller.enableNoiseReduction.value,
                       Icons.auto_fix_high,
                     ),
                     _buildSettingToggle(
                       'sharpening',
                       'sharpening'.tr,
-                      'Sharpen text and edges',
+                      'msg_sharpening_desc'.tr,
                       controller.enableSharpening.value,
                       Icons.auto_awesome,
                     ),
@@ -974,7 +974,7 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        isContinuing ? 'Loading...' : 'Processing...',
+                        isContinuing ? 'loading'.tr : 'processing'.tr,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -984,7 +984,7 @@ class ImagePreprocessingView extends GetView<ImagePreprocessingController> {
                     ],
                   )
                 : Text(
-                    progressComplete ? 'Continue' : 'Processing...',
+                    progressComplete ? 'apply_continue'.tr : 'processing'.tr,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,

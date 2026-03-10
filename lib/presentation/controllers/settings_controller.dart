@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../core/services/snackbar_service.dart';
 import '../../core/services/settings_storage_service.dart';
@@ -20,15 +19,16 @@ class SettingsController extends GetxController {
   Future<void> _loadLanguage() async {
     final storageService = SettingsStorageService();
     final savedLanguage = await storageService.getLanguage();
-    
+
     if (savedLanguage != null) {
       isArabic.value = savedLanguage == 'ar';
-      var locale = isArabic.value ? const Locale('ar', 'AE') : const Locale('en', 'US');
+      var locale =
+          isArabic.value ? const Locale('ar', 'AE') : const Locale('en', 'US');
       Get.updateLocale(locale);
     } else {
       // Sync toggle with current locale if no saved preference
-    if (Get.locale?.languageCode == 'ar') {
-      isArabic.value = true;
+      if (Get.locale?.languageCode == 'ar') {
+        isArabic.value = true;
       }
     }
   }
@@ -37,7 +37,7 @@ class SettingsController extends GetxController {
     isArabic.value = value;
     var locale = value ? const Locale('ar', 'AE') : const Locale('en', 'US');
     Get.updateLocale(locale);
-    
+
     // Save to storage using SettingsStorageService
     final storageService = SettingsStorageService();
     await storageService.saveLanguage(locale.languageCode);
@@ -60,9 +60,7 @@ class SettingsController extends GetxController {
           ),
           TextButton(
             onPressed: () => Get.back(result: true),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: Text('btn_logout'.tr),
           ),
         ],
@@ -74,26 +72,23 @@ class SettingsController extends GetxController {
         // Sign out from Firebase Auth
         await _authService.signOut();
         debugPrint('✅ User signed out from Firebase');
-        
-        // Clear local settings
-      final storageService = SettingsStorageService();
-      await storageService.clearAllSettings();
-        debugPrint('✅ Local settings cleared');
-      
-      // Show success message
-      SnackbarService.to.showSuccess(
-        'title_signed_out'.tr,
-        'msg_logout_success'.tr,
-      );
 
-      // Navigate to auth screen and clear navigation stack
-      Get.offAllNamed(AppRoutes.auth);
+        // Clear local settings
+        final storageService = SettingsStorageService();
+        await storageService.clearAllSettings();
+        debugPrint('✅ Local settings cleared');
+
+        // Show success message
+        SnackbarService.to.showSuccess(
+          'title_signed_out'.tr,
+          'msg_logout_success'.tr,
+        );
+
+        // Navigate to auth screen and clear navigation stack
+        Get.offAllNamed(AppRoutes.auth);
       } catch (e) {
         debugPrint('❌ Logout error: $e');
-        SnackbarService.to.showError(
-          'title_error'.tr,
-          'Failed to logout. Please try again.',
-        );
+        SnackbarService.to.showError('title_error'.tr, 'msg_logout_failed'.tr);
       }
     }
   }

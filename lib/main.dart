@@ -3,11 +3,13 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'firebase_options.dart';
-import 'core/services/fcm_service.dart' show FCMService, firebaseMessagingBackgroundHandler;
+import 'core/services/fcm_service.dart'
+    show FCMService, firebaseMessagingBackgroundHandler;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/services/screen_privacy_service.dart';
 import 'core/services/auto_lock_service.dart';
 import 'core/services/settings_storage_service.dart';
+import 'core/services/activity_tracking_service.dart';
 import 'core/widgets/interaction_tracker.dart';
 // TEMPORARY: Remove after seeding data
 // import 'data/helpers/seed_invoice_data.dart';
@@ -66,20 +68,21 @@ import 'presentation/controllers/image_preprocessing_controller.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'dart:async';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // Initialize Firebase
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
     // Register background message handler (must be called before runApp)
     if (!kIsWeb) {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     }
-    
+
     // Initialize Firebase Cloud Messaging (only on mobile, not web)
     if (!kIsWeb) {
       try {
@@ -88,13 +91,14 @@ void main() async {
       } catch (e) {
         debugPrint('⚠️ FCM initialization failed: $e');
       }
-      
+
       // Initialize screen privacy
       try {
         final settingsService = SettingsStorageService();
         final securitySettings = await settingsService.loadSecuritySettings();
-        final screenPrivacyEnabled = securitySettings['screenPrivacy'] as bool? ?? true;
-        
+        final screenPrivacyEnabled =
+            securitySettings['screenPrivacy'] as bool? ?? true;
+
         if (screenPrivacyEnabled) {
           await ScreenPrivacyService.enable();
           debugPrint('✅ Screen privacy enabled');
@@ -102,7 +106,7 @@ void main() async {
       } catch (e) {
         debugPrint('⚠️ Screen privacy initialization failed: $e');
       }
-      
+
       // Initialize auto-lock service
       try {
         await AutoLockService.instance.initialize();
@@ -111,7 +115,7 @@ void main() async {
         debugPrint('⚠️ Auto-lock initialization failed: $e');
       }
     }
-    
+
     // TEMPORARY: Seed sample invoice data (run once, then comment again)
     // debugPrint('Starting to seed sample invoices...');
     // final success = await seedSampleInvoices();
@@ -120,69 +124,70 @@ void main() async {
     // } else {
     //   debugPrint('❌ Failed to seed sample invoices');
     // }
-  } catch (e, stackTrace) {
-    debugPrint('Firebase initialization error: $e');
-    debugPrint('Stack trace: $stackTrace');
-  }
-  
-  try {
-    await initializeDateFormatting('ar', null);
-  } catch (e) {
-    debugPrint('Date formatting initialization error: $e');
-  }
-  
-  // SystemChrome is not needed on web
-  if (!kIsWeb) {
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: AppColors.primaryBlue,
-      statusBarIconBrightness: Brightness.light,
-    ));
-  }
-  
-  // Set up error handlers
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('FlutterError: ${details.exception}');
-    debugPrint('Stack trace: ${details.stack}');
-    // Also log to console for web debugging
-    if (kIsWeb) {
-      print('FlutterError: ${details.exception}');
-      print('Stack: ${details.stack}');
+    } catch (e, stackTrace) {
+      debugPrint('Firebase initialization error: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
-  };
-  
-  // Set up error widget builder to show errors instead of white screen
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    debugPrint('ErrorWidget.builder called: ${details.exception}');
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              const Text(
-                'An error occurred',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                details.exception.toString(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
+
+    try {
+      await initializeDateFormatting('en_US', null);
+      await initializeDateFormatting('ar', null);
+    } catch (e) {
+      debugPrint('Date formatting initialization error: $e');
+    }
+
+    // SystemChrome is not needed on web
+    if (!kIsWeb) {
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: AppColors.primaryBlue,
+          statusBarIconBrightness: Brightness.light,
+        ),
+      );
+    }
+
+    // Set up error handlers
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('FlutterError: ${details.exception}');
+      debugPrint('Stack trace: ${details.stack}');
+      // Also log to console for web debugging
+      if (kIsWeb) {
+        print('FlutterError: ${details.exception}');
+        print('Stack: ${details.stack}');
+      }
+    };
+
+    // Set up error widget builder to show errors instead of white screen
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      debugPrint('ErrorWidget.builder called: ${details.exception}');
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                const Text(
+                  'An error occurred',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  details.exception.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  };
-  
-  // Wrap in zone to catch all errors
-  runZonedGuarded(() {
+      );
+    };
+
     runApp(const MyApp());
   }, (error, stack) {
     debugPrint('Zone error: $error');
@@ -208,13 +213,23 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         return InteractionTracker(
           child: MediaQuery(
-            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(1.0)),
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(1.0)),
             child: child ?? const SizedBox(),
           ),
         );
       },
+      routingCallback: (routing) {
+        final route = routing?.current;
+        if (route != null && route.isNotEmpty) {
+          ActivityTrackingService.instance.trackRouteView(route);
+        }
+      },
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF002060)), // Primary Blue from AppColors
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF002060),
+        ), // Primary Blue from AppColors
         scaffoldBackgroundColor: Colors.white,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
@@ -232,7 +247,9 @@ class MyApp extends StatelessWidget {
       initialRoute: AppRoutes.splash,
       initialBinding: BindingsBuilder(() {
         Get.put(StatusBarController());
-        Get.put(ComplianceStatusService()); // Register compliance service globally
+        Get.put(
+          ComplianceStatusService(),
+        ); // Register compliance service globally
         Get.put(SnackbarService()); // Register snackbar service globally
       }),
       getPages: [
@@ -246,10 +263,7 @@ class MyApp extends StatelessWidget {
             );
           }),
         ),
-        GetPage(
-          name: AppRoutes.ocrTips,
-          page: () => const OCRTipsView(),
-        ),
+        GetPage(name: AppRoutes.ocrTips, page: () => const OCRTipsView()),
         GetPage(
           name: AppRoutes.helpSupport,
           page: () => const HelpSupportView(),
@@ -291,7 +305,7 @@ class MyApp extends StatelessWidget {
             Get.lazyPut<AuthController>(() => AuthController(), fenix: true);
           }),
         ),
-      GetPage(
+        GetPage(
           name: AppRoutes.main,
           page: () => const MainView(),
           binding: BindingsBuilder(() {
@@ -309,7 +323,9 @@ class MyApp extends StatelessWidget {
           name: AppRoutes.invoiceDetails,
           page: () => const InvoiceDetailsView(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<InvoiceDetailsController>(() => InvoiceDetailsController());
+            Get.lazyPut<InvoiceDetailsController>(
+              () => InvoiceDetailsController(),
+            );
           }),
         ),
         GetPage(
@@ -323,7 +339,9 @@ class MyApp extends StatelessWidget {
           name: AppRoutes.invoiceFilters,
           page: () => const InvoiceFiltersView(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<InvoiceFiltersController>(() => InvoiceFiltersController());
+            Get.lazyPut<InvoiceFiltersController>(
+              () => InvoiceFiltersController(),
+            );
           }),
         ),
         GetPage(
@@ -337,35 +355,45 @@ class MyApp extends StatelessWidget {
           name: AppRoutes.notificationSettings,
           page: () => const NotificationSettingsView(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<NotificationSettingsController>(() => NotificationSettingsController());
+            Get.lazyPut<NotificationSettingsController>(
+              () => NotificationSettingsController(),
+            );
           }),
         ),
         GetPage(
           name: AppRoutes.changePassword,
           page: () => const ChangePasswordView(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<ChangePasswordController>(() => ChangePasswordController());
+            Get.lazyPut<ChangePasswordController>(
+              () => ChangePasswordController(),
+            );
           }),
         ),
         GetPage(
           name: AppRoutes.forgotPassword,
           page: () => const ForgotPasswordView(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<ForgotPasswordController>(() => ForgotPasswordController());
+            Get.lazyPut<ForgotPasswordController>(
+              () => ForgotPasswordController(),
+            );
           }),
         ),
         GetPage(
           name: AppRoutes.resetPassword,
           page: () => const ResetPasswordView(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<ResetPasswordController>(() => ResetPasswordController());
+            Get.lazyPut<ResetPasswordController>(
+              () => ResetPasswordController(),
+            );
           }),
         ),
         GetPage(
           name: AppRoutes.imagePreprocessing,
           page: () => const ImagePreprocessingView(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<ImagePreprocessingController>(() => ImagePreprocessingController());
+            Get.lazyPut<ImagePreprocessingController>(
+              () => ImagePreprocessingController(),
+            );
           }),
         ),
         GetPage(

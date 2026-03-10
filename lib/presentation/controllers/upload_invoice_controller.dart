@@ -1,10 +1,12 @@
 import 'package:get/get.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // Conditional import for File
 import 'dart:io' show File if (dart.library.html) 'package:fineye/presentation/controllers/file_stub.dart' show File;
 import '../../data/services/invoice_input_service.dart';
 import '../../data/models/invoice_file_result.dart';
 import '../../core/constants/app_routes.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/services/snackbar_service.dart';
 
 class UploadInvoiceController extends GetxController {
@@ -34,36 +36,35 @@ class UploadInvoiceController extends GetxController {
       // On web, pass imageBytes; on mobile, pass file
       if (kIsWeb && result.imageBytes != null) {
         print('📤 Upload Controller: Navigating to preprocessing with ${result.imageBytes!.length} bytes');
-        await Get.toNamed(
+        Get.toNamed(
           AppRoutes.imagePreprocessing,
           arguments: {
             'imageBytes': result.imageBytes,
             'type': result.type,
           },
         );
-        print('✅ Upload Controller: Navigation to preprocessing completed (web)');
+        print('✅ Upload Controller: Navigation to preprocessing initiated (web)');
       } else if (!kIsWeb && result.file != null) {
         print('📤 Upload Controller: Navigating to preprocessing with file: ${result.file!.path}');
-        await Get.toNamed(
+        Get.toNamed(
           AppRoutes.imagePreprocessing,
           arguments: {
             'file': result.file,
             'type': result.type,
           },
         );
-        print('✅ Upload Controller: Navigation to preprocessing completed (mobile)');
+        print('✅ Upload Controller: Navigation to preprocessing initiated (mobile)');
       } else {
         print('❌ Upload Controller: Missing required data - imageBytes: ${result.imageBytes != null}, file: ${result.file != null}');
         SnackbarService.to.showError(
-          'Error',
-          'Failed to load image. Please try again.',
+          'title_error'.tr,
+          'msg_failed_load_image'.tr,
         );
-        return;
       }
     } catch (e) {
       SnackbarService.to.showError(
-        'Camera Error',
-        'Failed to capture invoice: ${e.toString()}',
+        'title_camera_error'.tr,
+        'msg_failed_capture_invoice'.tr,
       );
     }
   }
@@ -85,36 +86,35 @@ class UploadInvoiceController extends GetxController {
       // On web, pass imageBytes; on mobile, pass file
       if (kIsWeb && result.imageBytes != null) {
         print('📤 Upload Controller: Navigating to preprocessing with ${result.imageBytes!.length} bytes');
-        await Get.toNamed(
+        Get.toNamed(
           AppRoutes.imagePreprocessing,
           arguments: {
             'imageBytes': result.imageBytes,
             'type': result.type,
           },
         );
-        print('✅ Upload Controller: Navigation to preprocessing completed (web)');
+        print('✅ Upload Controller: Navigation to preprocessing initiated (web)');
       } else if (!kIsWeb && result.file != null) {
         print('📤 Upload Controller: Navigating to preprocessing with file: ${result.file!.path}');
-        await Get.toNamed(
+        Get.toNamed(
           AppRoutes.imagePreprocessing,
           arguments: {
             'file': result.file,
             'type': result.type,
           },
         );
-        print('✅ Upload Controller: Navigation to preprocessing completed (mobile)');
+        print('✅ Upload Controller: Navigation to preprocessing initiated (mobile)');
       } else {
         print('❌ Upload Controller: Missing required data - imageBytes: ${result.imageBytes != null}, file: ${result.file != null}');
         SnackbarService.to.showError(
-          'Error',
-          'Failed to load image. Please try again.',
+          'title_error'.tr,
+          'msg_failed_load_image'.tr,
         );
-        return;
       }
     } catch (e) {
       SnackbarService.to.showError(
-        'File Selection Error',
-        'Failed to select file: ${e.toString()}',
+        'title_file_selection_error'.tr,
+        'msg_failed_select_file'.tr,
       );
     }
   }

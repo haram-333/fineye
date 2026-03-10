@@ -14,24 +14,18 @@ enum InvoiceRiskType {
 
 enum InvoiceRiskSeverity {
   warning, // Medium Risk (Amber)
-  high,    // High Risk (Red)
-  low,     // Low Risk (Blue)
+  high, // High Risk (Red)
+  low, // Low Risk (Blue)
 }
 
 class InvoiceRisk {
   final InvoiceRiskType type;
   final InvoiceRiskSeverity severity;
 
-  const InvoiceRisk({
-    required this.type,
-    required this.severity,
-  });
+  const InvoiceRisk({required this.type, required this.severity});
 
   Map<String, dynamic> toMap() {
-    return {
-      'type': type.name,
-      'severity': severity.name,
-    };
+    return {'type': type.name, 'severity': severity.name};
   }
 
   factory InvoiceRisk.fromMap(Map<String, dynamic> map) {
@@ -54,8 +48,10 @@ class Invoice {
   final String id;
 
   final String supplierName;
+  final String invoiceType; // purchase | sale
   final String category;
   final DateTime date;
+  final double netAmount;
   final double grossAmount;
   final double vatAmount;
   final double additionalCharges; // Delivery, service charges, etc.
@@ -73,6 +69,7 @@ class Invoice {
   /// Optional URL of the stored invoice image (e.g. in Firebase Storage).
   /// This allows the invoice detail screen to show the original image.
   final String? imageUrl;
+  final String? imageFingerprint;
 
   /// Firestore document ID for this invoice in the `user_invoices` collection.
   /// This is different from the human-readable `id` field (invoice number).
@@ -88,8 +85,10 @@ class Invoice {
   Invoice({
     required this.id,
     required this.supplierName,
+    this.invoiceType = 'purchase',
     required this.category,
     required this.date,
+    this.netAmount = 0.0,
     required this.grossAmount,
     required this.vatAmount,
     this.additionalCharges = 0.0,
@@ -101,6 +100,7 @@ class Invoice {
     this.dueDate,
     this.userId = '',
     this.imageUrl,
+    this.imageFingerprint,
     this.firestoreDocId,
     this.risks = const [],
     bool isFlagged = false,
@@ -108,15 +108,18 @@ class Invoice {
 
   bool get hasRisk => risks.isNotEmpty;
 
-  bool get hasHighRisk => risks.any((r) => r.severity == InvoiceRiskSeverity.high);
+  bool get hasHighRisk =>
+      risks.any((r) => r.severity == InvoiceRiskSeverity.high);
 
   // Convert Invoice to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'supplierName': supplierName,
+      'invoiceType': invoiceType,
       'category': category,
       'date': Timestamp.fromDate(date),
+      'netAmount': netAmount,
       'grossAmount': grossAmount,
       'vatAmount': vatAmount,
       'additionalCharges': additionalCharges,
@@ -128,6 +131,7 @@ class Invoice {
       'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
       'userId': userId,
       'imageUrl': imageUrl,
+      'imageFingerprint': imageFingerprint,
       'risks': risks.map((r) => r.toMap()).toList(),
       'isFlagged': isFlagged.value,
       'createdAt': FieldValue.serverTimestamp(),
@@ -140,8 +144,14 @@ class Invoice {
     return Invoice(
       id: map['id'] ?? documentId,
       supplierName: map['supplierName'] ?? '',
+      invoiceType: map['invoiceType'] ?? 'purchase',
       category: map['category'] ?? '',
       date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      netAmount:
+          (map['netAmount'] as num?)?.toDouble() ??
+          ((map['grossAmount'] as num?)?.toDouble() ?? 0.0) -
+              ((map['vatAmount'] as num?)?.toDouble() ?? 0.0) -
+              ((map['additionalCharges'] as num?)?.toDouble() ?? 0.0),
       grossAmount: (map['grossAmount'] as num?)?.toDouble() ?? 0.0,
       vatAmount: (map['vatAmount'] as num?)?.toDouble() ?? 0.0,
       additionalCharges: (map['additionalCharges'] as num?)?.toDouble() ?? 0.0,
@@ -153,8 +163,10 @@ class Invoice {
       dueDate: (map['dueDate'] as Timestamp?)?.toDate(),
       userId: map['userId'] ?? '',
       imageUrl: map['imageUrl'] as String?,
+      imageFingerprint: map['imageFingerprint'] as String?,
       firestoreDocId: documentId, // Store the Firestore document ID
-      risks: (map['risks'] as List<dynamic>?)
+      risks:
+          (map['risks'] as List<dynamic>?)
               ?.map((r) => InvoiceRisk.fromMap(r as Map<String, dynamic>))
               .toList() ??
           [],
@@ -172,8 +184,10 @@ class Invoice {
   Invoice copyWith({
     String? id,
     String? supplierName,
+    String? invoiceType,
     String? category,
     DateTime? date,
+    double? netAmount,
     double? grossAmount,
     double? vatAmount,
     double? additionalCharges,
@@ -186,14 +200,17 @@ class Invoice {
     List<InvoiceRisk>? risks,
     String? userId,
     String? imageUrl,
+    String? imageFingerprint,
     String? firestoreDocId,
     bool? isFlagged,
   }) {
     return Invoice(
       id: id ?? this.id,
       supplierName: supplierName ?? this.supplierName,
+      invoiceType: invoiceType ?? this.invoiceType,
       category: category ?? this.category,
       date: date ?? this.date,
+      netAmount: netAmount ?? this.netAmount,
       grossAmount: grossAmount ?? this.grossAmount,
       vatAmount: vatAmount ?? this.vatAmount,
       additionalCharges: additionalCharges ?? this.additionalCharges,
@@ -205,10 +222,10 @@ class Invoice {
       dueDate: dueDate ?? this.dueDate,
       userId: userId ?? this.userId,
       imageUrl: imageUrl ?? this.imageUrl,
+      imageFingerprint: imageFingerprint ?? this.imageFingerprint,
       firestoreDocId: firestoreDocId ?? this.firestoreDocId,
       risks: risks ?? this.risks,
       isFlagged: isFlagged ?? this.isFlagged.value,
     );
   }
 }
-

@@ -165,3 +165,56 @@ function getDefaultTranslation(key, params = {}) {
   return translation;
 }
 
+/**
+ * Callable function to grant/revoke admin access using Firebase custom claims.
+ * Only existing admins can call this function.
+ *
+ * Payload:
+ * {
+ *   email: string,
+ *   makeAdmin: boolean
+ * }
+ */
+exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+  if (!context.auth || context.auth.token.admin !== true) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Only admins can manage admin access.'
+    );
+  }
+
+  const email = (data.email || '').toString().trim().toLowerCase();
+  const makeAdmin = data.makeAdmin === true;
+
+  if (!email) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'email is required.'
+    );
+  }
+
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    const existingClaims = userRecord.customClaims || {};
+
+    await admin.auth().setCustomUserClaims(userRecord.uid, {
+      ...existingClaims,
+      admin: makeAdmin,
+    });
+
+    return {
+      success: true,
+      uid: userRecord.uid,
+      email: userRecord.email,
+      admin: makeAdmin,
+      message: makeAdmin ? 'Admin access granted.' : 'Admin access revoked.',
+    };
+  } catch (error) {
+    console.error('setAdminClaim error:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to update admin claim.'
+    );
+  }
+});
+

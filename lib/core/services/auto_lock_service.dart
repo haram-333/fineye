@@ -110,21 +110,21 @@ class AutoLockService {
       Get.dialog(
         AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.security, color: Color(0xFF002060)),
-              SizedBox(width: 10),
-              Text('Security Notice'),
+              const Icon(Icons.security, color: Color(0xFF002060)),
+              const SizedBox(width: 10),
+              Text('security_notice_title'.tr),
             ],
           ),
-          content: const Text(
-            'Your session has expired due to 5 minutes of inactivity. You have been logged out to protect your financial data.',
-            style: TextStyle(fontSize: 16),
+          content: Text(
+            'security_notice_session_expired'.tr,
+            style: const TextStyle(fontSize: 16),
           ),
           actions: [
             TextButton(
               onPressed: () => Get.back(),
-              child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF002060))),
+              child: Text('btn_ok'.tr, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF002060))),
             ),
           ],
         ),

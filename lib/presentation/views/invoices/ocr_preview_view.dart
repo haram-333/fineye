@@ -1,9 +1,10 @@
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/ocr_preview_controller.dart';
 import '../../../data/models/invoice_model.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/format_helper.dart';
 
 class OCRPreviewView extends GetView<OCRPreviewController> {
   const OCRPreviewView({super.key});
@@ -28,6 +29,10 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildOcrSuccessBanner(),
+                    const SizedBox(height: 16),
+                    _buildReviewWarningBox(),
+                    const SizedBox(height: 16),
                     _buildRiskSummary(),
                     const SizedBox(height: 16),
                     _buildWarnings(),
@@ -69,7 +74,7 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
       elevation: 0,
       flexibleSpace: ClipRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(color: Colors.transparent),
         ),
       ),
@@ -389,13 +394,13 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
 
   Widget _buildRawJsonSection() {
     return _buildSection(
-      'Raw AI Data', // Hardcoded title as requested "big ass textfield"
+      'raw_ai_data'.tr, 
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Extracted Data (JSON)',
-            style: TextStyle(
+          Text(
+            'extracted_json'.tr,
+            style: const TextStyle(
               fontSize: 14,
               color: Colors.grey,
               fontWeight: FontWeight.w500,
@@ -520,7 +525,7 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
               children: [
                 Expanded(
                   child: Text(
-                    '${date.day}/${date.month}/${date.year}',
+                    FormatHelper.date(date),
                     style: const TextStyle(
                       fontSize: 15,
                       color: AppColors.ink,
@@ -587,7 +592,7 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             child: SelectableText(
               text,
-              textDirection: containsArabic ? TextDirection.rtl : TextDirection.ltr,
+              textDirection: containsArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
               textAlign: TextAlign.start,
               style: TextStyle(
                 fontSize: 16,
@@ -665,11 +670,11 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
         ),
         const SizedBox(height: 8),
         Obx(() => TextField(
-          controller: TextEditingController(text: amount.value.toStringAsFixed(2))
+          controller: TextEditingController(text: FormatHelper.amount(amount.value))
             ..selection = TextSelection.collapsed(offset: amount.value.toStringAsFixed(2).length),
           readOnly: readOnly,
           keyboardType: TextInputType.number,
-          textDirection: TextDirection.ltr,
+          textDirection: ui.TextDirection.ltr,
           onChanged: onChanged,
           style: TextStyle(
             fontSize: isGross ? 18 : 15,
@@ -946,6 +951,75 @@ class OCRPreviewView extends GetView<OCRPreviewController> {
           child: Text('cancel'.tr, style: const TextStyle(color: Colors.grey)),
         ),
       ],
+    );
+  }
+
+  Widget _buildOcrSuccessBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.successGreen,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'ocr_success_title'.tr,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'extracted_fields_count'.trParams({
+              'count': (3 + controller.additionalFields.length).toString(),
+            }),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewWarningBox() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF9C3), // Light yellow
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFACC15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              'ocr_review_warning'.tr,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF713F12),
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.info_outline, color: Color(0xFFA16207), size: 20),
+        ],
+      ),
     );
   }
 

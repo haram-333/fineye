@@ -35,7 +35,7 @@ class BottomNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _buildNavItem(0, Icons.home_outlined, Icons.home, 'nav_home'.tr),
+          _buildNavItem(0, Icons.dashboard_outlined, Icons.dashboard, 'nav_home'.tr),
           _buildNavItem(1, Icons.description_outlined, Icons.description, 'nav_invoices'.tr),
           _buildNavItem(2, Icons.center_focus_strong_outlined, Icons.center_focus_strong, 'nav_upload'.tr),
           _buildNavItem(3, Icons.notifications_outlined, Icons.notifications, 'nav_alerts'.tr),

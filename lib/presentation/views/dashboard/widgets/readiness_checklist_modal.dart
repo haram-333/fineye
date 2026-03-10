@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/compliance_colors.dart';
+import '../../../../core/utils/format_helper.dart';
 import '../../../../domain/services/compliance_status_service.dart';
 import '../../../controllers/dashboard_controller.dart';
 import '../../../controllers/main_controller.dart';
@@ -314,9 +315,7 @@ class ReadinessChecklistModal extends StatelessWidget {
 
   Widget _buildExportButton(DashboardController controller) {
     return ElevatedButton(
-      onPressed: () {
-        controller.performActualExport();
-      },
+      onPressed: () => _showExportSelectionDialog(Get.context!, controller),
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 16),
         backgroundColor: AppColors.successGreen,
@@ -339,6 +338,223 @@ class ReadinessChecklistModal extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showExportSelectionDialog(BuildContext context, DashboardController controller) {
+    // Current period formatted string
+    final range = controller.selectedVatPeriod.value;
+    String currentPeriodStr;
+    if (range.start.year == range.end.year && range.start.month == range.end.month) {
+      currentPeriodStr = FormatHelper.monthYear(range.start);
+    } else {
+      currentPeriodStr = '${FormatHelper.date(range.start)} - ${FormatHelper.date(range.end)}';
+    }
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'dialog_export_period_title'.tr,
+                style: const TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.ink,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              
+              // Option 1: Current Month
+               _buildExportOption(
+                icon: Icons.calendar_today,
+                label: 'btn_export_current'.trParams({'month': currentPeriodStr}),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  // Show format selection dialog
+                  _showFormatSelectionDialog(context, controller, customRange: null);
+                },
+                isPrimary: true,
+              ),
+              const SizedBox(height: 12),
+              
+              // Option 2: Select Date Range
+              _buildExportOption(
+                icon: Icons.date_range,
+                label: 'btn_select_month'.tr,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  // Use date range picker for flexible range selection
+                   final DateTimeRange? pickedRange = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2101),
+                    initialDateRange: controller.selectedVatPeriod.value,
+                  );
+                  
+                  if (pickedRange != null) {
+                    // Show format selection dialog
+                    _showFormatSelectionDialog(context, controller, customRange: pickedRange);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              
+              // Option 3: Custom Range
+              _buildExportOption(
+                icon: Icons.linear_scale,
+                label: 'btn_select_range'.tr,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final DateTimeRange? pickedRange = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2101),
+                    initialDateRange: controller.selectedVatPeriod.value,
+                  );
+                  
+                  if (pickedRange != null) {
+                    controller.performActualExport(customRange: pickedRange);
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('cancel'.tr, style: const TextStyle(color: Colors.grey)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildExportOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isPrimary = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isPrimary ? AppColors.primaryBlue.withOpacity(0.05) : Colors.white,
+          border: Border.all(
+            color: isPrimary ? AppColors.primaryBlue : Colors.grey.shade300,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon, 
+              color: isPrimary ? AppColors.primaryBlue : Colors.grey.shade600,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isPrimary ? FontWeight.bold : FontWeight.w500,
+                  color: isPrimary ? AppColors.primaryBlue : AppColors.ink,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: isPrimary ? AppColors.primaryBlue : Colors.grey.shade400,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFormatSelectionDialog(BuildContext context, DashboardController controller, {DateTimeRange? customRange}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'dialog_export_format_title'.tr,
+                style: const TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.ink,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              
+              // Option 1: PDF Only
+              _buildExportOption(
+                icon: Icons.picture_as_pdf,
+                label: 'btn_export_pdf'.tr,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  controller.performActualExport(customRange: customRange, exportFormat: 'pdf');
+                },
+                isPrimary: true,
+              ),
+              const SizedBox(height: 12),
+              
+              // Option 2: Excel Only
+              _buildExportOption(
+                icon: Icons.table_chart,
+                label: 'btn_export_excel'.tr,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  controller.performActualExport(customRange: customRange, exportFormat: 'excel');
+                },
+              ),
+              const SizedBox(height: 12),
+              
+              // Option 3: Both
+              _buildExportOption(
+                icon: Icons.file_download,
+                label: 'btn_export_both'.tr,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  controller.performActualExport(customRange: customRange, exportFormat: 'both');
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('cancel'.tr, style: const TextStyle(color: Colors.grey)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
